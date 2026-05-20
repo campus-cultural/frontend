@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { clearAuthToken } from '@/services/auth-token';
 import {
   CampusEvent,
   CurrentUser,
@@ -30,8 +31,8 @@ export default function ProfileScreen() {
   const canManageEvents = user?.role === 'professor' || user?.role === 'admin';
 
   const loadProfile = useCallback(async () => {
-    if (!hasAuthToken()) {
-      setError('Configure EXPO_PUBLIC_AUTH_TOKEN para carregar o perfil pelo backend.');
+    if (!(await hasAuthToken())) {
+      router.replace('/login' as never);
       setIsLoading(false);
       return;
     }
@@ -52,7 +53,7 @@ export default function ProfileScreen() {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [router]);
 
   useFocusEffect(
     useCallback(() => {
@@ -126,6 +127,18 @@ export default function ProfileScreen() {
                 <Text style={styles.primaryButtonText}>Cadastrar Evento</Text>
               </Pressable>
             ) : null}
+
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Sair da conta"
+              onPress={async () => {
+                await clearAuthToken();
+                router.replace('/login' as never);
+              }}
+              style={styles.signOutButton}>
+              <MaterialIcons name="logout" size={15} color="#6B7280" />
+              <Text style={styles.signOutText}>Sair da Conta</Text>
+            </Pressable>
 
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>
@@ -322,6 +335,23 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '900',
     letterSpacing: 1.1,
+    textTransform: 'uppercase',
+  },
+  signOutButton: {
+    alignItems: 'center',
+    backgroundColor: '#ECEDEF',
+    borderRadius: 6,
+    flexDirection: 'row',
+    gap: 8,
+    height: 46,
+    justifyContent: 'center',
+    marginTop: 10,
+  },
+  signOutText: {
+    color: '#6B7280',
+    fontSize: 12,
+    fontWeight: '900',
+    letterSpacing: 0.8,
     textTransform: 'uppercase',
   },
   section: {

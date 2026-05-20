@@ -1,11 +1,11 @@
 import { Platform } from 'react-native';
 import { jwtDecode } from 'jwt-decode';
 
+import { getAuthToken, saveAuthToken } from './auth-token';
+
 export const API_BASE_URL =
   process.env.EXPO_PUBLIC_API_URL ??
   (Platform.OS === 'android' ? 'http://10.0.2.2:8000' : 'http://127.0.0.1:8000');
-
-const AUTH_TOKEN = process.env.EXPO_PUBLIC_AUTH_TOKEN;
 
 export type UserRole = 'student' | 'professor' | 'admin';
 
@@ -43,12 +43,46 @@ type CreateEventPayload = {
   description: string;
 };
 
-export function hasAuthToken() {
-  return Boolean(AUTH_TOKEN);
+type LoginPayload = {
+  email: string;
+  password: string;
+};
+
+type TokenOut = {
+  access_token: string;
+  token_type: string;
+};
+
+export async function hasAuthToken() {
+  return Boolean(await getAuthToken());
+}
+
+export async function login(payload: LoginPayload) {
+  const response = await fetch(`${API_BASE_URL}/users/login`, {
+    body: JSON.stringify(payload),
+    headers: {
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+    },
+    method: 'POST',
+  });
+
+  if (!response.ok) {
+    if (response.status === 401) {
+      throw new Error('E-mail ou senha inválidos.');
+    }
+
+    const message = await response.text();
+    throw new Error(message || `A API respondeu com status ${response.status}.`);
+  }
+
+  const token = (await response.json()) as TokenOut;
+  await saveAuthToken(token.access_token);
+  return token;
 }
 
 export async function getCurrentUser() {
-  const tokenPayload = getTokenPayload();
+  const tokenPayload = await getTokenPayload();
   return request<CurrentUser>(`/users/${tokenPayload.sub}`);
 }
 
@@ -63,24 +97,28 @@ export async function createEvent(payload: CreateEventPayload) {
   });
 }
 
-function getTokenPayload() {
-  if (!AUTH_TOKEN) {
-    throw new Error('Informe EXPO_PUBLIC_AUTH_TOKEN para autenticar com o backend.');
+async function getTokenPayload() {
+  const authToken = await getAuthToken();
+
+  if (!authToken) {
+    throw new Error('Faça login para autenticar com o backend.');
   }
 
-  return jwtDecode<TokenPayload>(AUTH_TOKEN);
+  return jwtDecode<TokenPayload>(authToken);
 }
 
 async function request<T>(path: string, init?: RequestInit) {
-  if (!AUTH_TOKEN) {
-    throw new Error('Informe EXPO_PUBLIC_AUTH_TOKEN para autenticar com o backend.');
+  const authToken = await getAuthToken();
+
+  if (!authToken) {
+    throw new Error('Faça login para autenticar com o backend.');
   }
 
   const response = await fetch(`${API_BASE_URL}${path}`, {
     ...init,
     headers: {
       Accept: 'application/json',
-      Authorization: `Bearer ${AUTH_TOKEN}`,
+      Authorization: `Bearer ${authToken}`,
       'Content-Type': 'application/json',
       ...init?.headers,
     },

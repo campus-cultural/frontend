@@ -45,7 +45,8 @@
           "photosPermission": "Permita acessar suas fotos para selecionar o banner do evento."
         }
       ],
-      "@react-native-community/datetimepicker"
+      "@react-native-community/datetimepicker",
+      "expo-secure-store"
     ],
     "experiments": {
       "typedRoutes": true,
