@@ -1,3 +1,4 @@
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { Tabs } from 'expo-router';
 import React from 'react';
 
@@ -11,6 +12,7 @@ export default function TabLayout() {
 
   return (
     <Tabs
+      initialRouteName="perfil"
       screenOptions={{
         tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
         headerShown: false,
@@ -29,6 +31,17 @@ export default function TabLayout() {
           title: 'Explore',
           tabBarIcon: ({ color }) => <IconSymbol size={28} name="paperplane.fill" color={color} />,
         }}
+      />
+      <Tabs.Screen
+        name="perfil"
+        options={{
+          title: 'Perfil',
+          tabBarIcon: ({ color }) => <MaterialIcons size={28} name="person" color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="novo-evento"
+        options={{ href: null }}
       />
     </Tabs>
   );
