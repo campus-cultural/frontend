@@ -1,5 +1,4 @@
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
-import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
@@ -22,7 +21,6 @@ export default function LoginScreen() {
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [isPasswordVisible, setIsPasswordVisible] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
@@ -65,75 +63,62 @@ export default function LoginScreen() {
         style={styles.container}>
         <View style={styles.content}>
           <View style={styles.logoBlock}>
-            <Image source={require('@/assets/images/icon.png')} style={styles.logo} contentFit="contain" />
-            <Text style={styles.brand}>UTFPR Cultura</Text>
-            <Text style={styles.subtitle}>Acesse sua conta para continuar.</Text>
+            <UtfprLogo />
+            <Text style={styles.brand}>UTFPR CULTURAL</Text>
+            <Text style={styles.subtitle}>ACESSO INSTITUCIONAL</Text>
           </View>
 
-          <View style={styles.form}>
+          <View style={styles.card}>
             <View>
-              <Text style={styles.label}>E-mail institucional</Text>
-              <View style={styles.inputShell}>
-                <MaterialIcons name="mail" size={18} color="#9CA3AF" />
+              <Text style={styles.label}>Email *</Text>
+              <View style={styles.inputLine}>
                 <TextInput
                   autoCapitalize="none"
                   autoComplete="email"
                   keyboardType="email-address"
                   onChangeText={setEmail}
-                  placeholder="seu.email@utfpr.edu.br"
-                  placeholderTextColor="#B9BDC4"
+                  placeholder="Insira seu email institucional"
+                  placeholderTextColor="#B9B9B9"
                   style={styles.input}
                   value={email}
                 />
+                <MaterialIcons name="alternate-email" size={24} color="#C8C8C8" />
               </View>
             </View>
 
             <View>
-              <Text style={styles.label}>Senha</Text>
-              <View style={styles.inputShell}>
-                <MaterialIcons name="lock" size={18} color="#9CA3AF" />
+              <Text style={styles.label}>Senha *</Text>
+              <View style={styles.inputLine}>
                 <TextInput
                   autoCapitalize="none"
                   onChangeText={setPassword}
-                  placeholder="Digite sua senha"
-                  placeholderTextColor="#B9BDC4"
-                  secureTextEntry={!isPasswordVisible}
+                  placeholder="Insira sua senha"
+                  placeholderTextColor="#B9B9B9"
+                  secureTextEntry
                   style={styles.input}
                   value={password}
                 />
-                <Pressable
-                  accessibilityLabel={isPasswordVisible ? 'Ocultar senha' : 'Mostrar senha'}
-                  accessibilityRole="button"
-                  onPress={() => setIsPasswordVisible((current) => !current)}
-                  hitSlop={10}>
-                  <MaterialIcons
-                    name={isPasswordVisible ? 'visibility-off' : 'visibility'}
-                    size={18}
-                    color="#9CA3AF"
-                  />
-                </Pressable>
+                <MaterialIcons name="lock-outline" size={24} color="#C8C8C8" />
               </View>
             </View>
 
-            <Pressable accessibilityRole="button" style={styles.forgotButton}>
-              <Text style={styles.forgotText}>Esqueceu sua senha?</Text>
+            <Pressable
+              accessibilityRole="button"
+              disabled={isLoading}
+              onPress={handleLogin}
+              style={[styles.loginButton, isLoading ? styles.loginButtonDisabled : null]}>
+              {isLoading ? <ActivityIndicator color="#111111" /> : null}
+              <Text style={styles.loginButtonText}>Entrar</Text>
             </Pressable>
-          </View>
 
-          <Pressable
-            accessibilityRole="button"
-            disabled={isLoading}
-            onPress={handleLogin}
-            style={[styles.loginButton, isLoading ? styles.loginButtonDisabled : null]}>
-            {isLoading ? <ActivityIndicator color="#111111" /> : null}
-            <Text style={styles.loginButtonText}>Entrar</Text>
-          </Pressable>
-
-          <View style={styles.footer}>
-            <Text style={styles.footerText}>Ainda não tem cadastro?</Text>
-            <Pressable accessibilityRole="button">
-              <Text style={styles.footerAction}>Criar conta</Text>
-            </Pressable>
+            <View style={styles.cardActions}>
+              <Pressable accessibilityRole="button" onPress={() => router.push('/cadastro' as never)}>
+                <Text style={styles.cardActionText}>Cadastrar</Text>
+              </Pressable>
+              <Pressable accessibilityRole="button">
+                <Text style={styles.cardActionText}>Esqueceu a senha</Text>
+              </Pressable>
+            </View>
           </View>
         </View>
       </KeyboardAvoidingView>
@@ -141,10 +126,20 @@ export default function LoginScreen() {
   );
 }
 
+function UtfprLogo() {
+  return (
+    <View style={styles.logo}>
+      <Text style={styles.logoText}>UTFPR</Text>
+      <View style={styles.logoAccent} />
+      <Text style={styles.logoCaption}>UNIVERSIDADE TECNOLÓGICA FEDERAL DO PARANÁ</Text>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#F9F9F9',
+    backgroundColor: '#FFFFFF',
   },
   container: {
     flex: 1,
@@ -152,102 +147,116 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     justifyContent: 'center',
-    paddingHorizontal: 24,
+    paddingHorizontal: 32,
     paddingVertical: 28,
   },
   logoBlock: {
     alignItems: 'center',
-    marginBottom: 42,
+    marginBottom: 34,
   },
   logo: {
-    height: 82,
-    width: 82,
+    alignItems: 'center',
+  },
+  logoText: {
+    color: '#050505',
+    fontSize: 58,
+    fontWeight: '900',
+    letterSpacing: 0,
+    lineHeight: 62,
+  },
+  logoAccent: {
+    backgroundColor: '#FFCC00',
+    height: 28,
+    marginLeft: 42,
+    marginTop: -38,
+    width: 38,
+    zIndex: -1,
+  },
+  logoCaption: {
+    color: '#111111',
+    fontSize: 7,
+    fontWeight: '900',
+    marginTop: 12,
   },
   brand: {
-    color: '#111111',
-    fontSize: 24,
+    color: '#202020',
+    fontSize: 21,
     fontWeight: '900',
-    marginTop: 18,
+    marginTop: 28,
   },
   subtitle: {
-    color: '#7A7F87',
+    color: '#4F4F4F',
     fontSize: 14,
     fontWeight: '700',
-    marginTop: 7,
+    letterSpacing: 0.8,
+    marginTop: 8,
   },
-  form: {
-    gap: 16,
+  card: {
+    backgroundColor: '#FFFFFF',
+    borderColor: '#F0F0F0',
+    borderRadius: 8,
+    borderWidth: 1,
+    gap: 28,
+    paddingHorizontal: 30,
+    paddingVertical: 32,
+    shadowColor: '#111111',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.03,
+    shadowRadius: 18,
+    elevation: 2,
   },
   label: {
-    color: '#2B2B2B',
-    fontSize: 10,
+    color: '#222222',
+    fontSize: 11,
     fontWeight: '900',
-    letterSpacing: 0.8,
-    marginBottom: 8,
+    letterSpacing: 1.4,
+    marginBottom: 14,
     textTransform: 'uppercase',
   },
-  inputShell: {
+  inputLine: {
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderColor: '#E5E7EB',
-    borderRadius: 7,
-    borderWidth: 1,
+    borderBottomColor: '#E3E3E3',
+    borderBottomWidth: 2,
     flexDirection: 'row',
-    gap: 10,
-    height: 54,
-    paddingHorizontal: 14,
+    height: 42,
   },
   input: {
-    color: '#111111',
+    color: '#222222',
     flex: 1,
     fontSize: 15,
-    fontWeight: '700',
     height: '100%',
-  },
-  forgotButton: {
-    alignSelf: 'flex-end',
-    paddingVertical: 2,
-  },
-  forgotText: {
-    color: '#7A7F87',
-    fontSize: 12,
-    fontWeight: '800',
+    paddingHorizontal: 0,
   },
   loginButton: {
     alignItems: 'center',
     backgroundColor: '#FFCC00',
-    borderRadius: 7,
+    borderRadius: 3,
     flexDirection: 'row',
     gap: 10,
-    height: 56,
+    height: 58,
     justifyContent: 'center',
-    marginTop: 34,
+    marginTop: 10,
   },
   loginButtonDisabled: {
     opacity: 0.7,
   },
   loginButtonText: {
     color: '#111111',
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '900',
-    letterSpacing: 3,
     textTransform: 'uppercase',
   },
-  footer: {
+  cardActions: {
     alignItems: 'center',
     flexDirection: 'row',
-    gap: 6,
-    justifyContent: 'center',
-    marginTop: 22,
+    justifyContent: 'space-between',
+    marginTop: 10,
   },
-  footerText: {
-    color: '#7A7F87',
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  footerAction: {
-    color: '#111111',
-    fontSize: 13,
+  cardActionText: {
+    color: '#4F4A45',
+    fontSize: 11,
     fontWeight: '900',
+    letterSpacing: 2,
+    textTransform: 'uppercase',
   },
 });

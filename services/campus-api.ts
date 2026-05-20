@@ -43,6 +43,17 @@ type CreateEventPayload = {
   description: string;
 };
 
+export type RegisterUserPayload = {
+  role: Exclude<UserRole, 'admin'>;
+  email: string;
+  name: string;
+  last_name: string;
+  birth_date: string | null;
+  is_active: boolean;
+  ra: string | null;
+  password: string;
+};
+
 type LoginPayload = {
   email: string;
   password: string;
@@ -79,6 +90,24 @@ export async function login(payload: LoginPayload) {
   const token = (await response.json()) as TokenOut;
   await saveAuthToken(token.access_token);
   return token;
+}
+
+export async function registerUser(payload: RegisterUserPayload) {
+  const response = await fetch(`${API_BASE_URL}/users/register`, {
+    body: JSON.stringify(payload),
+    headers: {
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+    },
+    method: 'POST',
+  });
+
+  if (!response.ok) {
+    const message = await response.text();
+    throw new Error(message || `A API respondeu com status ${response.status}.`);
+  }
+
+  return (await response.json()) as CurrentUser;
 }
 
 export async function getCurrentUser() {
