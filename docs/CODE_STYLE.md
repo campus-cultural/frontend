@@ -34,6 +34,7 @@ Este guia define o padrao esperado para contribuicoes no frontend.
 - Nao expor detalhes sensiveis do backend em alerts.
 - Validacao no frontend melhora UX, mas nao substitui validacao no backend.
 - Tokens devem ficar em `src/lib/auth/token.ts`.
+- Tokens expirados ou invalidos devem ser removidos antes de redirecionar o usuario.
 
 ## Variaveis de Ambiente
 
@@ -48,6 +49,8 @@ Este guia define o padrao esperado para contribuicoes no frontend.
 - Nao adicionar `console.log` em codigo de producao.
 - Nao armazenar senha em estado alem do necessario para submeter formulario.
 - Limpar token ao sair da conta.
+- Em iOS/Android, use `expo-secure-store` para tokens de usuario; nao use AsyncStorage para sessao autenticada.
+- No web, `localStorage` e apenas compatibilidade do Expo Web. Antes de producao web, reavaliar estrategia com cookies seguros no backend.
 - Preferir HTTPS fora do desenvolvimento local.
 - Falhas de rede devem mostrar mensagens genericas e acionaveis.
 

@@ -15,8 +15,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { getAuthToken } from '@/src/lib/auth/token';
-import { login } from '@/src/lib/api/campus';
+import { hasAuthToken, login } from '@/src/lib/api/campus';
 
 const logoUtf = require('@/assets/logoUTF.png');
 
@@ -28,7 +27,7 @@ export default function LoginScreen() {
 
   useEffect(() => {
     async function redirectAuthenticatedUser() {
-      if (await getAuthToken()) {
+      if (await hasAuthToken()) {
         router.replace('/perfil');
       }
     }

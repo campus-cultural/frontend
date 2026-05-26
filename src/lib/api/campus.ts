@@ -1,6 +1,6 @@
 import { jwtDecode } from 'jwt-decode';
 
-import { getAuthToken, saveAuthToken } from '@/src/lib/auth/token';
+import { clearAuthToken, getAuthToken, saveAuthToken } from '@/src/lib/auth/token';
 import { env } from '@/src/lib/config/env';
 
 export const API_BASE_URL = env.apiBaseUrl;
@@ -31,6 +31,7 @@ export type CampusEvent = {
 type TokenPayload = {
   sub: string;
   role: UserRole;
+  exp?: number;
 };
 
 type CreateEventPayload = {
@@ -63,7 +64,12 @@ type TokenOut = {
 };
 
 export async function hasAuthToken() {
-  return Boolean(await getAuthToken());
+  try {
+    await getTokenPayload();
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export async function login(payload: LoginPayload) {
@@ -105,7 +111,31 @@ async function getTokenPayload() {
     throw new Error('Faça login para autenticar com o backend.');
   }
 
-  return jwtDecode<TokenPayload>(authToken);
+  try {
+    const tokenPayload = jwtDecode<TokenPayload>(authToken);
+
+    if (isTokenExpired(tokenPayload)) {
+      await clearAuthToken();
+      throw new Error('Sessão expirada. Faça login novamente.');
+    }
+
+    return tokenPayload;
+  } catch (error) {
+    if (error instanceof Error && error.message === 'Sessão expirada. Faça login novamente.') {
+      throw error;
+    }
+
+    await clearAuthToken();
+    throw new Error('Sessão inválida. Faça login novamente.');
+  }
+}
+
+function isTokenExpired(tokenPayload: TokenPayload) {
+  if (typeof tokenPayload.exp !== 'number') {
+    return false;
+  }
+
+  return tokenPayload.exp <= Math.floor(Date.now() / 1000);
 }
 
 async function request<T>(path: string, init?: RequestInit) {
@@ -114,6 +144,8 @@ async function request<T>(path: string, init?: RequestInit) {
   if (!authToken) {
     throw new Error('Faça login para autenticar com o backend.');
   }
+
+  await getTokenPayload();
 
   return requestJson<T>(path, {
     ...init,
