@@ -8,12 +8,17 @@
     "reset-project": "node ./scripts/reset-project.js",
     "android": "expo start --android",
     "ios": "expo start --ios",
+    "run:android": "expo run:android",
+    "run:ios": "expo run:ios",
+    "prebuild": "expo prebuild",
+    "prebuild:clean": "expo prebuild --clean",
     "web": "expo start --web",
     "typecheck": "tsc --noEmit",
     "lint": "expo lint",
     "check": "npm run typecheck && npm run lint",
     "export:web": "expo export --platform web",
     "build:android:preview": "npx eas build --platform android --profile preview",
+    "build:android:preview:local": "npx eas build --platform android --profile preview --local",
     "build:android:production": "npx eas build --platform android --profile production"
   },
   "dependencies": {

@@ -31,7 +31,7 @@ Referências oficiais:
 ```bash
 git clone https://github.com/campus-cultural/frontend.git
 cd frontend
-git checkout feature/cadastro-de-eventos
+git checkout develop
 npm install
 cp .env.example .env
 ```
@@ -70,6 +70,8 @@ npm run ios
 npm run web
 npm run start:clear
 ```
+
+Esses scripts abrem o app em modo de desenvolvimento. Para compilar um binário nativo localmente, use os scripts `run:*` ou `build:*`.
 
 ## Android Studio - Windows
 
@@ -189,7 +191,47 @@ npm run export:web
 
 O resultado sai em `dist/`.
 
-## Build Android com EAS
+## Identidade Nativa do App
+
+O `ios.bundleIdentifier` e o `android.package`, em `app.json`, são os identificadores nativos únicos do aplicativo. Eles seguem formato de domínio reverso e devem representar o projeto, não a máquina ou pessoa que fez o build.
+
+Neste projeto:
+
+```text
+br.edu.utfpr.campuscultural
+```
+
+No iOS, esse valor precisa existir/ser registrado na conta Apple Developer apenas para assinatura, distribuição e App Store. Para simulador local, ele serve como identificador do app instalado. No Android, `android.package` vira o application id usado pelo sistema, pelo emulador e pela Play Store.
+
+Permissões nativas também saem do `app.json`. Se alguma biblioteca adicionar uma permissão que o app não usa, bloqueie em `android.blockedPermissions` para evitar permissões desnecessárias no APK/AAB.
+
+## Build Local Android
+
+Para compilar e instalar uma build de debug no emulador/dispositivo:
+
+```bash
+npm run run:android
+```
+
+O Expo CLI gera `android/` automaticamente na primeira execução se a pasta ainda não existir.
+
+Para regenerar o projeto nativo do zero quando `app.json` mudar:
+
+```bash
+npm run prebuild:clean -- --platform android
+```
+
+Para gerar APK interno com EAS local:
+
+```bash
+npm run build:android:preview:local
+```
+
+O EAS local exige Android SDK/NDK configurado na máquina. No Windows, a Expo recomenda usar WSL para EAS local; para desenvolvimento diário no Windows, prefira `npm run run:android` ou abra o projeto gerado no Android Studio.
+
+Evite commitar as pastas nativas geradas (`android/`, `ios/`) sem alinhamento com o time.
+
+## Build Android com EAS Cloud
 
 Faça login no Expo/EAS:
 
@@ -210,28 +252,6 @@ npm run build:android:production
 ```
 
 Por padrão, o perfil `production` gera AAB para distribuição em loja. Para instalar diretamente em aparelho/emulador, use o perfil `preview`, que gera APK.
-
-Instalar build mais recente no emulador:
-
-```bash
-npx eas build:run -p android --latest
-```
-
-## Build Local Android
-
-Para gerar projeto nativo local:
-
-```bash
-npx expo prebuild
-```
-
-Depois:
-
-```bash
-npx expo run:android --variant release
-```
-
-Evite commitar as pastas nativas geradas (`android/`, `ios/`) sem alinhamento com o time.
 
 ## Estrutura do Projeto
 
