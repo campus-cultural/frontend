@@ -1,4 +1,5 @@
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import { Image } from 'expo-image';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import {
@@ -13,17 +14,15 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import {
   CampusEvent,
-  CurrentUser,
-  getCurrentUser,
   isAuthSessionError,
   listEvents,
 } from '@/src/lib/api/campus';
+import { getEventImageUri } from '@/src/lib/events/eventImage';
 import { mockEvents } from '@/src/lib/events/mockEvents';
 
 export default function HomeScreen() {
   const router = useRouter();
-  const [events, setEvents] = useState<CampusEvent[]>(mockEvents);
-  const [user, setUser] = useState<CurrentUser | null>(null);
+  const [events, setEvents] = useState<CampusEvent[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
   useFocusEffect(
@@ -34,14 +33,13 @@ export default function HomeScreen() {
         setIsLoading(true);
 
         try {
-          const [currentUser, apiEvents] = await Promise.all([getCurrentUser(), listEvents()]);
+          const apiEvents = await listEvents();
 
           if (!isMounted) {
             return;
           }
 
-          setUser(currentUser);
-          setEvents(apiEvents.length ? apiEvents : mockEvents);
+          setEvents(apiEvents);
         } catch (homeError) {
           if (isAuthSessionError(homeError)) {
             router.replace('/login' as never);
@@ -79,12 +77,7 @@ export default function HomeScreen() {
         ) : null}
 
         {events.map((event, index) => (
-          <EventCard
-            event={event}
-            index={index}
-            key={event.id}
-            userName={user?.name ?? 'Erinaldo Pereira'}
-          />
+          <EventCard event={event} index={index} key={event.id} />
         ))}
       </ScrollView>
     </SafeAreaView>
@@ -94,25 +87,19 @@ export default function HomeScreen() {
 function EventCard({
   event,
   index,
-  userName,
 }: {
   event: CampusEvent;
   index: number;
-  userName: string;
 }) {
   const isSubscribed = index === 1;
+  const imageUri = getEventImageUri(event.image);
 
   return (
     <View style={styles.card}>
-      <View style={styles.authorRow}>
-        <View style={styles.authorAvatar}>
-          <MaterialIcons name="person" size={14} color="#FFFFFF" />
-        </View>
-        <Text style={styles.authorName}>{userName}</Text>
-      </View>
-
       <View style={[styles.eventVisual, index % 2 ? styles.artVisual : styles.musicVisual]}>
-        {index % 2 ? (
+        {imageUri ? (
+          <Image source={{ uri: imageUri }} contentFit="cover" style={styles.eventImage} />
+        ) : index % 2 ? (
           <>
             <View style={styles.artShapeLarge} />
             <View style={styles.artShapeMedium} />
@@ -219,9 +206,13 @@ const styles = StyleSheet.create({
   },
   eventVisual: {
     alignItems: 'center',
-    height: 230,
+    height: 250,
     justifyContent: 'center',
     overflow: 'hidden',
+  },
+  eventImage: {
+    height: '100%',
+    width: '100%',
   },
   musicVisual: {
     backgroundColor: '#A66605',

@@ -42,6 +42,8 @@ type CreateEventPayload = {
   description: string;
 };
 
+type UpdateEventPayload = Partial<CreateEventPayload>;
+
 export type RegisterUserPayload = {
   role: Exclude<UserRole, 'admin'>;
   email: string;
@@ -108,10 +110,21 @@ export async function listEvents() {
   return request<CampusEvent[]>('/events');
 }
 
+export async function getEvent(eventId: number) {
+  return request<CampusEvent>(`/events/${eventId}`);
+}
+
 export async function createEvent(payload: CreateEventPayload) {
   return request<CampusEvent>('/events', {
     body: JSON.stringify(payload),
     method: 'POST',
+  });
+}
+
+export async function updateEvent(eventId: number, payload: UpdateEventPayload) {
+  return request<CampusEvent>(`/events/${eventId}`, {
+    body: JSON.stringify(payload),
+    method: 'PUT',
   });
 }
 

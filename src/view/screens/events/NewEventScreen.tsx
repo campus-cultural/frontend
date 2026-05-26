@@ -2,8 +2,8 @@ import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/dat
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
-import { useRouter } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -18,8 +18,9 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { createEvent, isAuthSessionError } from '@/src/lib/api/campus';
+import { createEvent, getEvent, isAuthSessionError, updateEvent } from '@/src/lib/api/campus';
 import { clearAuthToken } from '@/src/lib/auth/token';
+import { getEventImageBase64, getEventImageUri } from '@/src/lib/events/eventImage';
 
 const DESCRIPTION_LIMIT = 500;
 
@@ -56,17 +57,64 @@ type PickerMode = 'date' | 'time';
 
 export default function NewEventScreen() {
   const router = useRouter();
+  const { eventId } = useLocalSearchParams<{ eventId?: string }>();
+  const editingEventId = eventId ? Number(eventId) : null;
   const [form, setForm] = useState<EventForm>(initialForm);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [pickerMode, setPickerMode] = useState<PickerMode | null>(null);
   const [errors, setErrors] = useState<Partial<Record<keyof EventForm, string>>>({});
+  const [isLoadingEvent, setIsLoadingEvent] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
+  const isEditing = Number.isFinite(editingEventId);
   const descriptionReachedLimit = form.description.length >= DESCRIPTION_LIMIT;
   const hasDraft = useMemo(
     () => Object.values(form).some((value) => value.trim().length > 0),
     [form],
   );
+
+  useEffect(() => {
+    async function loadEventForEditing() {
+      if (!isEditing || editingEventId === null) {
+        discardDraft();
+        return;
+      }
+
+      setIsLoadingEvent(true);
+
+      try {
+        const event = await getEvent(editingEventId);
+        const nextDate = new Date(event.event_datetime);
+
+        setSelectedDate(nextDate);
+        setForm({
+          imageName: event.image ? 'banner-atual.jpg' : '',
+          imageUri: getEventImageUri(event.image) ?? '',
+          imageMimeType: event.image ? 'image/jpeg' : '',
+          imageBase64: getEventImageBase64(event.image),
+          name: event.name,
+          dateTime: formatDateTime(nextDate),
+          place: event.event_location,
+          description: event.description,
+        });
+      } catch (error) {
+        if (isAuthSessionError(error)) {
+          await clearAuthToken();
+          router.replace('/login' as never);
+          return;
+        }
+
+        Alert.alert(
+          'Não foi possível carregar',
+          error instanceof Error ? error.message : 'Tente novamente em instantes.',
+        );
+      } finally {
+        setIsLoadingEvent(false);
+      }
+    }
+
+    void loadEventForEditing();
+  }, [editingEventId, isEditing, router]);
 
   function updateField(field: keyof EventForm, value: string) {
     setForm((current) => ({ ...current, [field]: value }));
@@ -152,15 +200,22 @@ export default function NewEventScreen() {
     setIsSaving(true);
 
     try {
-      await createEvent({
+      const payload = {
         image: form.imageBase64 || null,
         name: form.name.trim(),
         event_datetime: selectedDate?.toISOString() ?? new Date().toISOString(),
         event_location: form.place.trim(),
         description: form.description.trim(),
-      });
-      Alert.alert('Evento salvo', 'O novo evento foi criado como ativo.');
-      discardDraft();
+      };
+
+      if (isEditing && editingEventId !== null) {
+        await updateEvent(editingEventId, payload);
+        Alert.alert('Evento atualizado', 'As alterações foram salvas.');
+      } else {
+        await createEvent(payload);
+        Alert.alert('Evento salvo', 'O novo evento foi criado como ativo.');
+        discardDraft();
+      }
     } catch (error) {
       if (isAuthSessionError(error)) {
         await clearAuthToken();
@@ -201,6 +256,13 @@ export default function NewEventScreen() {
             <MaterialIcons name="arrow-back" size={20} color="#FFCC00" />
             <Text style={styles.backText}>Voltar</Text>
           </Pressable>
+
+          {isLoadingEvent ? (
+            <View style={styles.loadingEventBox}>
+              <ActivityIndicator color="#111111" />
+              <Text style={styles.loadingEventText}>Carregando evento...</Text>
+            </View>
+          ) : null}
 
           <Pressable
             accessibilityRole="button"
@@ -317,29 +379,31 @@ export default function NewEventScreen() {
           <View style={styles.actions}>
             <Pressable
               accessibilityRole="button"
-              disabled={isSaving}
+              disabled={isSaving || isLoadingEvent}
               onPress={saveEvent}
-              style={[styles.saveButton, isSaving ? styles.saveButtonDisabled : null]}>
+              style={[styles.saveButton, isSaving || isLoadingEvent ? styles.saveButtonDisabled : null]}>
               {isSaving ? (
                 <ActivityIndicator color="#111111" />
               ) : (
                 <MaterialIcons name="event-available" size={18} color="#111111" />
               )}
-              <Text style={styles.saveButtonText}>Salvar Evento</Text>
+              <Text style={styles.saveButtonText}>
+                {isEditing ? 'Atualizar Evento' : 'Salvar Evento'}
+              </Text>
             </Pressable>
 
             <Pressable
               accessibilityRole="button"
-              disabled={!hasDraft || isSaving}
+              disabled={!hasDraft || isSaving || isEditing}
               onPress={discardDraft}
               style={[
                 styles.discardButton,
-                !hasDraft || isSaving ? styles.discardButtonDisabled : null,
+                !hasDraft || isSaving || isEditing ? styles.discardButtonDisabled : null,
               ]}>
               <Text
                 style={[
                   styles.discardText,
-                  !hasDraft || isSaving ? styles.discardTextDisabled : null,
+                  !hasDraft || isSaving || isEditing ? styles.discardTextDisabled : null,
                 ]}>
                 Descartar Rascunho
               </Text>
@@ -501,6 +565,21 @@ const styles = StyleSheet.create({
     color: '#7A7F87',
     fontSize: 11,
     marginBottom: 16,
+  },
+  loadingEventBox: {
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 8,
+    flexDirection: 'row',
+    gap: 10,
+    justifyContent: 'center',
+    marginBottom: 12,
+    padding: 14,
+  },
+  loadingEventText: {
+    color: '#5F6670',
+    fontSize: 12,
+    fontWeight: '800',
   },
   form: {
     gap: 8,

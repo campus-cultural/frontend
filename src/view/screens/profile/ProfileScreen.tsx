@@ -11,6 +11,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -20,6 +21,8 @@ import {
   getCurrentUser,
   hasAuthToken,
   isAuthSessionError,
+  listEvents,
+  CampusEvent,
 } from '@/src/lib/api/campus';
 import { clearAuthToken } from '@/src/lib/auth/token';
 import { getProfileAvatarUri, saveProfileAvatarUri } from '@/src/lib/profile/avatar';
@@ -29,11 +32,16 @@ export default function ProfileScreen() {
   const [user, setUser] = useState<CurrentUser | null>(null);
   const [profileImageUri, setProfileImageUri] = useState<string | null>(null);
   const [savedProfileImageUri, setSavedProfileImageUri] = useState<string | null>(null);
+  const [professorEvents, setProfessorEvents] = useState<CampusEvent[]>([]);
+  const [eventSearch, setEventSearch] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const canManageEvents = user?.role === 'professor' || user?.role === 'admin';
   const hasUnsavedProfileImage = profileImageUri !== savedProfileImageUri;
+  const filteredProfessorEvents = professorEvents.filter((event) =>
+    event.name.toLowerCase().includes(eventSearch.trim().toLowerCase()),
+  );
 
   const loadProfile = useCallback(async () => {
     if (!(await hasAuthToken())) {
@@ -49,9 +57,13 @@ export default function ProfileScreen() {
     try {
       const currentUser = await getCurrentUser();
       const savedAvatarUri = await getProfileAvatarUri(currentUser.id);
+      const nextCanManageEvents = currentUser.role === 'professor' || currentUser.role === 'admin';
+      const nextEvents = nextCanManageEvents ? await listEvents() : [];
+
       setUser(currentUser);
       setProfileImageUri(savedAvatarUri);
       setSavedProfileImageUri(savedAvatarUri);
+      setProfessorEvents(nextEvents);
     } catch (profileError) {
       if (isAuthSessionError(profileError)) {
         await clearAuthToken();
@@ -164,24 +176,48 @@ export default function ProfileScreen() {
             ) : null}
 
             {canManageEvents ? (
+              <View style={styles.eventsArea}>
+                <View style={styles.searchBox}>
+                  <MaterialIcons name="search" size={17} color="#747A84" />
+                  <TextInput
+                    autoCapitalize="none"
+                    onChangeText={setEventSearch}
+                    placeholder="Pesquisa de Eventos..."
+                    placeholderTextColor="#C0C2C7"
+                    style={styles.searchInput}
+                    value={eventSearch}
+                  />
+                </View>
+
+                {filteredProfessorEvents.length ? (
+                  filteredProfessorEvents.map((event) => (
+                    <EditableEventCard event={event} key={event.id} />
+                  ))
+                ) : (
+                  <Text style={styles.emptyEventsText}>Nenhum evento encontrado.</Text>
+                )}
+              </View>
+            ) : null}
+
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Atualizar dados"
+              onPress={handleUpdateProfile}
+              style={styles.primaryButton}>
+              <MaterialIcons name="save" size={15} color="#111111" />
+              <Text style={styles.primaryButtonText}>Atualizar dados</Text>
+            </Pressable>
+
+            {canManageEvents ? (
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel="Cadastrar novo evento"
                 onPress={() => router.push('/novo-evento')}
-                style={styles.primaryButton}>
-                <MaterialIcons name="add-box" size={15} color="#111111" />
+                style={[styles.primaryButton, styles.createEventButton]}>
+                <MaterialIcons name="add" size={17} color="#111111" />
                 <Text style={styles.primaryButtonText}>Cadastrar evento</Text>
               </Pressable>
-            ) : (
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Atualizar dados"
-                onPress={handleUpdateProfile}
-                style={styles.primaryButton}>
-                <MaterialIcons name="save" size={15} color="#111111" />
-                <Text style={styles.primaryButtonText}>Atualizar dados</Text>
-              </Pressable>
-            )}
+            ) : null}
 
             {canManageEvents && hasUnsavedProfileImage ? (
               <Pressable
@@ -206,6 +242,46 @@ export default function ProfileScreen() {
         ) : null}
       </ScrollView>
     </SafeAreaView>
+  );
+}
+
+function EditableEventCard({ event }: { event: CampusEvent }) {
+  const router = useRouter();
+  const eventDate = new Date(event.event_datetime);
+
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`Editar evento ${event.name}`}
+      onPress={() =>
+        router.push({
+          pathname: '/novo-evento',
+          params: { eventId: String(event.id) },
+        } as never)
+      }
+      style={styles.editableEventCard}>
+      <View style={styles.eventAccent} />
+      <View style={styles.editableEventContent}>
+        <View style={styles.editableEventTop}>
+          <Text numberOfLines={2} style={styles.editableEventTitle}>
+            {event.name}
+          </Text>
+          <MaterialIcons name="edit" size={16} color="#8A8D94" />
+        </View>
+        <View style={styles.eventMeta}>
+          <View style={styles.eventMetaItem}>
+            <MaterialIcons name="schedule" size={12} color="#6F7782" />
+            <Text style={styles.eventMetaText}>{formatEventTime(eventDate)}</Text>
+          </View>
+          <View style={styles.eventMetaItem}>
+            <MaterialIcons name="place" size={12} color="#6F7782" />
+            <Text numberOfLines={1} style={styles.eventMetaText}>
+              {event.event_location}
+            </Text>
+          </View>
+        </View>
+      </View>
+    </Pressable>
   );
 }
 
@@ -239,6 +315,21 @@ function roleLabel(role: CurrentUser['role']) {
   };
 
   return labels[role];
+}
+
+function formatEventTime(value: Date) {
+  const start = new Intl.DateTimeFormat('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+    timeZone: 'UTC',
+  }).format(value);
+  const end = new Intl.DateTimeFormat('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+    timeZone: 'UTC',
+  }).format(new Date(value.getTime() + 90 * 60 * 1000));
+
+  return `${start} - ${end}`;
 }
 
 const styles = StyleSheet.create({
@@ -316,6 +407,84 @@ const styles = StyleSheet.create({
   profileBody: {
     gap: 17,
   },
+  eventsArea: {
+    gap: 14,
+    marginTop: 2,
+  },
+  searchBox: {
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderColor: '#D8D9DD',
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 10,
+    height: 52,
+    paddingHorizontal: 14,
+  },
+  searchInput: {
+    color: '#20242A',
+    flex: 1,
+    fontSize: 13,
+    fontWeight: '700',
+    height: '100%',
+  },
+  editableEventCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 8,
+    flexDirection: 'row',
+    minHeight: 78,
+    overflow: 'hidden',
+    shadowColor: '#111111',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.04,
+    shadowRadius: 14,
+    elevation: 1,
+  },
+  eventAccent: {
+    backgroundColor: '#FFCC00',
+    width: 4,
+  },
+  editableEventContent: {
+    flex: 1,
+    justifyContent: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  editableEventTop: {
+    alignItems: 'flex-start',
+    flexDirection: 'row',
+    gap: 10,
+  },
+  editableEventTitle: {
+    color: '#20242A',
+    flex: 1,
+    fontSize: 13,
+    fontWeight: '900',
+    lineHeight: 17,
+  },
+  eventMeta: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    marginTop: 9,
+  },
+  eventMetaItem: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 4,
+    maxWidth: '100%',
+  },
+  eventMetaText: {
+    color: '#5F6670',
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  emptyEventsText: {
+    color: '#7A7F87',
+    fontSize: 12,
+    fontWeight: '800',
+    textAlign: 'center',
+  },
   fieldGroup: {
     gap: 7,
   },
@@ -350,6 +519,9 @@ const styles = StyleSheet.create({
     height: 48,
     justifyContent: 'center',
     marginTop: 16,
+  },
+  createEventButton: {
+    marginTop: -5,
   },
   primaryButtonText: {
     color: '#111111',
