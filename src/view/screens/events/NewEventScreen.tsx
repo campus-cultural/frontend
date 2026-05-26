@@ -2,7 +2,7 @@ import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -71,6 +71,7 @@ export default function NewEventScreen() {
   const [isDatePopoverVisible, setIsDatePopoverVisible] = useState(false);
   const [feedback, setFeedback] = useState<Feedback | null>(null);
   const [errors, setErrors] = useState<Partial<Record<keyof EventForm, string>>>({});
+  const [isDescriptionFocused, setIsDescriptionFocused] = useState(false);
   const [isLoadingEvent, setIsLoadingEvent] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -329,6 +330,7 @@ export default function NewEventScreen() {
             />
 
             <LabeledInput
+              active={isDatePopoverVisible}
               editable={false}
               error={errors.dateTime}
               label="Data e Horário"
@@ -376,10 +378,16 @@ export default function NewEventScreen() {
               <TextInput
                 multiline
                 maxLength={DESCRIPTION_LIMIT}
+                onBlur={() => setIsDescriptionFocused(false)}
                 onChangeText={(value) => updateField('description', value)}
+                onFocus={() => setIsDescriptionFocused(true)}
                 placeholder="Descreva os detalhes do evento, palestrantes e pré-requisitos..."
                 placeholderTextColor="#B9BDC4"
-                style={[styles.descriptionInput, errors.description ? styles.inputError : null]}
+                style={[
+                  styles.descriptionInput,
+                  isDescriptionFocused ? styles.inputFocused : null,
+                  errors.description ? styles.inputError : null,
+                ]}
                 textAlignVertical="top"
                 value={form.description}
               />
@@ -489,6 +497,7 @@ export default function NewEventScreen() {
 }
 
 type LabeledInputProps = {
+  active?: boolean;
   editable?: boolean;
   error?: string;
   label: string;
@@ -501,6 +510,7 @@ type LabeledInputProps = {
 };
 
 function LabeledInput({
+  active = false,
   editable = true,
   error,
   label,
@@ -511,16 +521,29 @@ function LabeledInput({
   rightIcon,
   value,
 }: LabeledInputProps) {
+  const [isFocused, setIsFocused] = useState(false);
+  const inputRef = useRef<TextInput>(null);
+  const isActive = active || isFocused;
+
   return (
     <View>
       <View style={styles.labelRow}>
         <Text style={styles.label}>{label}</Text>
         <Text style={styles.required}>*</Text>
       </View>
-      <Pressable disabled={!onPress} onPress={onPress} style={[styles.inputShell, error ? styles.inputError : null]}>
+      <Pressable
+        onPress={onPress ?? (() => inputRef.current?.focus())}
+        style={[
+          styles.inputShell,
+          isActive ? styles.inputFocused : null,
+          error ? styles.inputError : null,
+        ]}>
         <TextInput
+          ref={inputRef}
           editable={editable}
           onChangeText={onChangeText}
+          onBlur={() => setIsFocused(false)}
+          onFocus={() => setIsFocused(true)}
           placeholder={placeholder}
           placeholderTextColor="#C7C9CE"
           pointerEvents={editable ? 'auto' : 'none'}
@@ -884,6 +907,10 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     flexDirection: 'row',
     minHeight: 44,
+  },
+  inputFocused: {
+    backgroundColor: '#FFFBEA',
+    borderBottomColor: '#FFCC00',
   },
   textInput: {
     color: '#202020',

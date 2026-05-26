@@ -277,7 +277,11 @@ export default function RegisterScreen() {
                 accessibilityRole="button"
                 accessibilityLabel="Selecionar data de nascimento"
                 onPress={openBirthDatePicker}
-                style={[styles.inputCard, errors.birthDate ? styles.inputError : null]}>
+                style={[
+                  styles.inputCard,
+                  showBirthPicker ? styles.inputFocused : null,
+                  errors.birthDate ? styles.inputError : null,
+                ]}>
                 <MaterialIcons name="calendar-today" size={20} color="#7C8794" />
                 <Text style={[styles.dateText, form.birthDate ? styles.dateTextFilled : null]}>
                   {birthDateLabel}
@@ -410,15 +414,24 @@ function FormInput({
   secureTextEntry,
   value,
 }: FormInputProps) {
+  const [isFocused, setIsFocused] = useState(false);
+
   return (
     <View>
       <Text style={styles.label}>{label} *</Text>
-      <View style={[styles.inputCard, error ? styles.inputError : null]}>
+      <View
+        style={[
+          styles.inputCard,
+          isFocused ? styles.inputFocused : null,
+          error ? styles.inputError : null,
+        ]}>
         <MaterialIcons name={icon} size={20} color="#7C8794" />
         <TextInput
           autoCapitalize={autoCapitalize}
           keyboardType={keyboardType}
+          onBlur={() => setIsFocused(false)}
           onChangeText={onChangeText}
+          onFocus={() => setIsFocused(true)}
           placeholder={placeholder}
           placeholderTextColor="#7C8794"
           secureTextEntry={secureTextEntry}
@@ -567,6 +580,10 @@ const styles = StyleSheet.create({
   },
   inputError: {
     borderColor: '#F04438',
+  },
+  inputFocused: {
+    backgroundColor: '#FFFBEA',
+    borderColor: '#FFCC00',
   },
   input: {
     color: '#1F2937',

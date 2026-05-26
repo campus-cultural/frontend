@@ -114,6 +114,7 @@ const styles = StyleSheet.create({
     flex: 1,
     height: 62,
     justifyContent: 'center',
+    minWidth: 96,
   },
   tabBarIcon: {
     alignItems: 'center',

@@ -2,10 +2,9 @@ import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -29,11 +28,14 @@ import { getProfileAvatarUri, saveProfileAvatarUri } from '@/src/lib/profile/ava
 
 export default function ProfileScreen() {
   const router = useRouter();
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [user, setUser] = useState<CurrentUser | null>(null);
   const [profileImageUri, setProfileImageUri] = useState<string | null>(null);
   const [savedProfileImageUri, setSavedProfileImageUri] = useState<string | null>(null);
   const [professorEvents, setProfessorEvents] = useState<CampusEvent[]>([]);
   const [eventSearch, setEventSearch] = useState('');
+  const [isSearchFocused, setIsSearchFocused] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -87,6 +89,29 @@ export default function ProfileScreen() {
     }, [loadProfile]),
   );
 
+  useEffect(() => {
+    return () => {
+      if (toastTimerRef.current) {
+        clearTimeout(toastTimerRef.current);
+      }
+    };
+  }, []);
+
+  function showToast(message: string) {
+    if (toastTimerRef.current) {
+      clearTimeout(toastTimerRef.current);
+    }
+
+    setToastMessage(message);
+    toastTimerRef.current = setTimeout(() => {
+      setToastMessage(null);
+    }, 2600);
+  }
+
+  function updateUserField(field: 'email' | 'last_name' | 'name', value: string) {
+    setUser((current) => (current ? { ...current, [field]: value } : current));
+  }
+
   async function handleSignOut() {
     await clearAuthToken();
     router.replace('/login' as never);
@@ -98,14 +123,14 @@ export default function ProfileScreen() {
       setSavedProfileImageUri(profileImageUri);
     }
 
-    Alert.alert('Perfil salvo', 'A imagem e os dados do perfil foram atualizados neste dispositivo.');
+    showToast('Perfil salvo com sucesso.');
   }
 
   async function handleChangeProfileImage() {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
 
     if (!permission.granted) {
-      Alert.alert('Permissão necessária', 'Permita o acesso à galeria para escolher a foto.');
+      showToast('Permita o acesso à galeria para escolher a foto.');
       return;
     }
 
@@ -167,9 +192,24 @@ export default function ProfileScreen() {
 
         {user ? (
           <View style={styles.profileBody}>
-            <ProfileField editable label="Nome" value={user.name} />
-            <ProfileField editable label="Sobrenome" value={user.last_name} />
-            <ProfileField label="E-mail institucional" value={user.email} />
+            <ProfileField
+              editable
+              label="Nome"
+              onChangeText={(value) => updateUserField('name', value)}
+              value={user.name}
+            />
+            <ProfileField
+              editable
+              label="Sobrenome"
+              onChangeText={(value) => updateUserField('last_name', value)}
+              value={user.last_name}
+            />
+            <ProfileField
+              editable
+              label="E-mail institucional"
+              onChangeText={(value) => updateUserField('email', value)}
+              value={user.email}
+            />
             <ProfileField label="Conta" value={roleLabel(user.role).toUpperCase()} />
             {user.role === 'student' && user.ra ? (
               <ProfileField label="RA" value={user.ra} />
@@ -177,11 +217,13 @@ export default function ProfileScreen() {
 
             {canManageEvents ? (
               <View style={styles.eventsArea}>
-                <View style={styles.searchBox}>
+                <View style={[styles.searchBox, isSearchFocused ? styles.searchBoxFocused : null]}>
                   <MaterialIcons name="search" size={17} color="#747A84" />
                   <TextInput
                     autoCapitalize="none"
+                    onBlur={() => setIsSearchFocused(false)}
                     onChangeText={setEventSearch}
+                    onFocus={() => setIsSearchFocused(true)}
                     placeholder="Pesquisa de Eventos..."
                     placeholderTextColor="#C0C2C7"
                     style={styles.searchInput}
@@ -241,6 +283,13 @@ export default function ProfileScreen() {
           </View>
         ) : null}
       </ScrollView>
+
+      {toastMessage ? (
+        <View pointerEvents="none" style={styles.toast}>
+          <MaterialIcons name="check-circle" size={18} color="#111111" />
+          <Text style={styles.toastText}>{toastMessage}</Text>
+        </View>
+      ) : null}
     </SafeAreaView>
   );
 }
@@ -288,21 +337,36 @@ function EditableEventCard({ event }: { event: CampusEvent }) {
 function ProfileField({
   editable,
   label,
+  onChangeText,
   value,
 }: {
   editable?: boolean;
   label: string;
+  onChangeText?: (value: string) => void;
   value: string;
 }) {
+  const [isFocused, setIsFocused] = useState(false);
+  const inputRef = useRef<TextInput>(null);
+
   return (
     <View style={styles.fieldGroup}>
       <Text style={styles.fieldLabel}>{label}</Text>
-      <View style={styles.fieldBox}>
-        <Text numberOfLines={1} style={styles.fieldValue}>
-          {value}
-        </Text>
+      <Pressable
+        disabled={!editable}
+        onPress={() => inputRef.current?.focus()}
+        style={[styles.fieldBox, isFocused ? styles.fieldBoxFocused : null]}>
+        <TextInput
+          ref={inputRef}
+          editable={Boolean(editable)}
+          onBlur={() => setIsFocused(false)}
+          onChangeText={onChangeText}
+          onFocus={() => setIsFocused(true)}
+          placeholderTextColor="#9EA3AB"
+          style={[styles.fieldValue, !editable ? styles.fieldValueDisabled : null]}
+          value={value}
+        />
         {editable ? <MaterialIcons name="edit" size={14} color="#8A8D94" /> : null}
-      </View>
+      </Pressable>
     </View>
   );
 }
@@ -421,6 +485,10 @@ const styles = StyleSheet.create({
     height: 52,
     paddingHorizontal: 14,
   },
+  searchBoxFocused: {
+    backgroundColor: '#FFFBEA',
+    borderColor: '#FFCC00',
+  },
   searchInput: {
     color: '#20242A',
     flex: 1,
@@ -498,17 +566,29 @@ const styles = StyleSheet.create({
   fieldBox: {
     alignItems: 'center',
     backgroundColor: '#F0F0F1',
+    borderColor: '#F0F0F1',
     borderBottomColor: '#D7D7D9',
     borderBottomWidth: 1,
+    borderWidth: 1,
     flexDirection: 'row',
     height: 44,
     paddingHorizontal: 12,
+  },
+  fieldBoxFocused: {
+    backgroundColor: '#FFFBEA',
+    borderBottomColor: '#FFCC00',
+    borderColor: '#FFCC00',
   },
   fieldValue: {
     color: '#20242A',
     flex: 1,
     fontSize: 13,
     fontWeight: '700',
+    height: '100%',
+    paddingHorizontal: 0,
+  },
+  fieldValueDisabled: {
+    color: '#20242A',
   },
   primaryButton: {
     alignItems: 'center',
@@ -561,5 +641,27 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     letterSpacing: 0.8,
     textTransform: 'uppercase',
+  },
+  toast: {
+    alignItems: 'center',
+    alignSelf: 'center',
+    backgroundColor: '#FFCC00',
+    borderRadius: 999,
+    bottom: 112,
+    flexDirection: 'row',
+    gap: 8,
+    minHeight: 44,
+    paddingHorizontal: 18,
+    position: 'absolute',
+    shadowColor: '#111111',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.14,
+    shadowRadius: 16,
+    elevation: 6,
+  },
+  toastText: {
+    color: '#111111',
+    fontSize: 12,
+    fontWeight: '900',
   },
 });

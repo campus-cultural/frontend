@@ -31,6 +31,7 @@ export default function ForgotPasswordScreen() {
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [emailError, setEmailError] = useState<string | null>(null);
+  const [isEmailFocused, setIsEmailFocused] = useState(false);
   const [modal, setModal] = useState<FeedbackModalState>(initialModal);
 
   function validateEmail() {
@@ -97,10 +98,16 @@ export default function ForgotPasswordScreen() {
             <Text style={styles.inputLabel}>
               E-mail <Text style={styles.requiredAsterisk}>*</Text>
             </Text>
-            <View style={[styles.inputContainer, emailError ? styles.inputError : null]}>
+            <View
+              style={[
+                styles.inputContainer,
+                isEmailFocused ? styles.inputFocused : null,
+                emailError ? styles.inputError : null,
+              ]}>
               <TextInput
                 autoCapitalize="none"
                 keyboardType="email-address"
+                onBlur={() => setIsEmailFocused(false)}
                 onChangeText={(value) => {
                   setEmail(value);
 
@@ -108,6 +115,7 @@ export default function ForgotPasswordScreen() {
                     setEmailError(null);
                   }
                 }}
+                onFocus={() => setIsEmailFocused(true)}
                 placeholder="exemplo@alunos.utfpr.edu.br"
                 placeholderTextColor="#9E9E9E"
                 style={styles.textInput}
@@ -231,9 +239,16 @@ const styles = StyleSheet.create({
     color: '#8A6D00',
   },
   inputContainer: {
+    backgroundColor: '#FFFFFF',
     borderBottomColor: '#D7D7D7',
     borderBottomWidth: 2,
+    paddingHorizontal: 8,
     paddingBottom: 12,
+    paddingTop: 8,
+  },
+  inputFocused: {
+    backgroundColor: '#FFFBEA',
+    borderBottomColor: '#FFCC00',
   },
   inputError: {
     borderBottomColor: '#F04438',

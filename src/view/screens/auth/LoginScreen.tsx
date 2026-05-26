@@ -19,10 +19,13 @@ import { hasAuthToken, login } from '@/src/lib/api/campus';
 
 const logoUtf = require('@/assets/logoUTF.png');
 
+type FocusedField = 'email' | 'password' | null;
+
 export default function LoginScreen() {
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [focusedField, setFocusedField] = useState<FocusedField>(null);
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
@@ -73,12 +76,14 @@ export default function LoginScreen() {
           <View style={styles.card}>
             <View>
               <Text style={styles.label}>Email *</Text>
-              <View style={styles.inputLine}>
+              <View style={[styles.inputLine, focusedField === 'email' ? styles.inputLineFocused : null]}>
                 <TextInput
                   autoCapitalize="none"
                   autoComplete="email"
                   keyboardType="email-address"
+                  onBlur={() => setFocusedField(null)}
                   onChangeText={setEmail}
+                  onFocus={() => setFocusedField('email')}
                   placeholder="Insira seu email institucional"
                   placeholderTextColor="#B9B9B9"
                   style={styles.input}
@@ -90,10 +95,12 @@ export default function LoginScreen() {
 
             <View>
               <Text style={styles.label}>Senha *</Text>
-              <View style={styles.inputLine}>
+              <View style={[styles.inputLine, focusedField === 'password' ? styles.inputLineFocused : null]}>
                 <TextInput
                   autoCapitalize="none"
+                  onBlur={() => setFocusedField(null)}
                   onChangeText={setPassword}
+                  onFocus={() => setFocusedField('password')}
                   placeholder="Insira sua senha"
                   placeholderTextColor="#B9B9B9"
                   secureTextEntry
@@ -187,10 +194,15 @@ const styles = StyleSheet.create({
   },
   inputLine: {
     alignItems: 'center',
+    backgroundColor: '#FFFFFF',
     borderBottomColor: '#E3E3E3',
     borderBottomWidth: 2,
     flexDirection: 'row',
     height: 42,
+  },
+  inputLineFocused: {
+    backgroundColor: '#FFFBEA',
+    borderBottomColor: '#FFCC00',
   },
   input: {
     color: '#222222',
