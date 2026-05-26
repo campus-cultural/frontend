@@ -18,7 +18,8 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { createEvent } from '@/src/lib/api/campus';
+import { createEvent, isAuthSessionError } from '@/src/lib/api/campus';
+import { clearAuthToken } from '@/src/lib/auth/token';
 
 const DESCRIPTION_LIMIT = 500;
 
@@ -161,6 +162,12 @@ export default function NewEventScreen() {
       Alert.alert('Evento salvo', 'O novo evento foi criado como ativo.');
       discardDraft();
     } catch (error) {
+      if (isAuthSessionError(error)) {
+        await clearAuthToken();
+        router.replace('/login' as never);
+        return;
+      }
+
       Alert.alert(
         'Não foi possível salvar',
         error instanceof Error ? error.message : 'Verifique se a API está rodando e tente novamente.',

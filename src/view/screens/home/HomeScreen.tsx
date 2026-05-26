@@ -1,5 +1,5 @@
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
@@ -11,10 +11,17 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { CampusEvent, CurrentUser, getCurrentUser, listEvents } from '@/src/lib/api/campus';
+import {
+  CampusEvent,
+  CurrentUser,
+  getCurrentUser,
+  isAuthSessionError,
+  listEvents,
+} from '@/src/lib/api/campus';
 import { mockEvents } from '@/src/lib/events/mockEvents';
 
 export default function HomeScreen() {
+  const router = useRouter();
   const [events, setEvents] = useState<CampusEvent[]>(mockEvents);
   const [user, setUser] = useState<CurrentUser | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -35,7 +42,12 @@ export default function HomeScreen() {
 
           setUser(currentUser);
           setEvents(apiEvents.length ? apiEvents : mockEvents);
-        } catch {
+        } catch (homeError) {
+          if (isAuthSessionError(homeError)) {
+            router.replace('/login' as never);
+            return;
+          }
+
           if (isMounted) {
             setEvents(mockEvents);
           }
@@ -51,7 +63,7 @@ export default function HomeScreen() {
       return () => {
         isMounted = false;
       };
-    }, []),
+    }, [router]),
   );
 
   return (
@@ -67,7 +79,12 @@ export default function HomeScreen() {
         ) : null}
 
         {events.map((event, index) => (
-          <EventCard event={event} index={index} key={event.id} userName={user?.name ?? 'Erinaldo Pereira'} />
+          <EventCard
+            event={event}
+            index={index}
+            key={event.id}
+            userName={user?.name ?? 'Erinaldo Pereira'}
+          />
         ))}
       </ScrollView>
     </SafeAreaView>

@@ -13,7 +13,12 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { CurrentUser, getCurrentUser, hasAuthToken } from '@/src/lib/api/campus';
+import {
+  CurrentUser,
+  getCurrentUser,
+  hasAuthToken,
+  isAuthSessionError,
+} from '@/src/lib/api/campus';
 import { clearAuthToken } from '@/src/lib/auth/token';
 
 export default function ProfileScreen() {
@@ -26,6 +31,7 @@ export default function ProfileScreen() {
 
   const loadProfile = useCallback(async () => {
     if (!(await hasAuthToken())) {
+      await clearAuthToken();
       router.replace('/login' as never);
       setIsLoading(false);
       return;
@@ -37,6 +43,12 @@ export default function ProfileScreen() {
     try {
       setUser(await getCurrentUser());
     } catch (profileError) {
+      if (isAuthSessionError(profileError)) {
+        await clearAuthToken();
+        router.replace('/login' as never);
+        return;
+      }
+
       setError(
         profileError instanceof Error
           ? profileError.message
@@ -100,7 +112,9 @@ export default function ProfileScreen() {
             <ProfileField editable label="Sobrenome" value={user.last_name} />
             <ProfileField label="E-mail institucional" value={user.email} />
             <ProfileField label="Conta" value={roleLabel(user.role).toUpperCase()} />
-            {user.role === 'student' && user.ra ? <ProfileField label="RA" value={user.ra} /> : null}
+            {user.role === 'student' && user.ra ? (
+              <ProfileField label="RA" value={user.ra} />
+            ) : null}
 
             {canManageEvents ? (
               <Pressable

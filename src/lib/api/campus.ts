@@ -63,6 +63,17 @@ type TokenOut = {
   token_type: string;
 };
 
+export class AuthSessionError extends Error {
+  constructor(message = 'Sessão expirada. Faça login novamente.') {
+    super(message);
+    this.name = 'AuthSessionError';
+  }
+}
+
+export function isAuthSessionError(error: unknown): error is AuthSessionError {
+  return error instanceof AuthSessionError;
+}
+
 export async function hasAuthToken() {
   try {
     await getTokenPayload();
@@ -108,7 +119,8 @@ async function getTokenPayload() {
   const authToken = await getAuthToken();
 
   if (!authToken) {
-    throw new Error('Faça login para autenticar com o backend.');
+    await clearAuthToken();
+    throw new AuthSessionError('Faça login para autenticar com o backend.');
   }
 
   try {
@@ -116,17 +128,17 @@ async function getTokenPayload() {
 
     if (isTokenExpired(tokenPayload)) {
       await clearAuthToken();
-      throw new Error('Sessão expirada. Faça login novamente.');
+      throw new AuthSessionError();
     }
 
     return tokenPayload;
   } catch (error) {
-    if (error instanceof Error && error.message === 'Sessão expirada. Faça login novamente.') {
+    if (isAuthSessionError(error)) {
       throw error;
     }
 
     await clearAuthToken();
-    throw new Error('Sessão inválida. Faça login novamente.');
+    throw new AuthSessionError('Sessão inválida. Faça login novamente.');
   }
 }
 
@@ -142,7 +154,8 @@ async function request<T>(path: string, init?: RequestInit) {
   const authToken = await getAuthToken();
 
   if (!authToken) {
-    throw new Error('Faça login para autenticar com o backend.');
+    await clearAuthToken();
+    throw new AuthSessionError('Faça login para autenticar com o backend.');
   }
 
   await getTokenPayload();
@@ -173,6 +186,11 @@ async function requestJson<T>(path: string, init?: RequestInit) {
   if (!response.ok) {
     if (response.status === 401 && path === '/users/login') {
       throw new Error('E-mail ou senha inválidos.');
+    }
+
+    if (response.status === 401) {
+      await clearAuthToken();
+      throw new AuthSessionError();
     }
 
     if (response.status === 404 && path.startsWith('/events')) {
