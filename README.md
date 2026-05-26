@@ -231,6 +231,31 @@ O EAS local exige Android SDK/NDK configurado na máquina. No Windows, a Expo re
 
 Evite commitar as pastas nativas geradas (`android/`, `ios/`) sem alinhamento com o time.
 
+### Erro ao baixar `com.android.tools.build:gradle`
+
+Se o build falhar com uma mensagem parecida com:
+
+```text
+Could not resolve com.android.tools.build:gradle
+Could not GET 'https://dl.google.com/dl/android/maven2/...'
+No route to host
+```
+
+o Gradle nao conseguiu acessar o Maven do Google. Isso acontece antes de compilar o app e normalmente indica bloqueio de rede, DNS, proxy, VPN, firewall ou certificado corporativo.
+
+Diagnostico rapido:
+
+```bash
+curl -I https://dl.google.com/dl/android/maven2/com/android/tools/build/gradle/8.11.0/gradle-8.11.0.pom
+```
+
+Se esse comando nao responder com HTTP `200`/`301`/`302`, resolva o acesso a `dl.google.com` antes de tentar buildar novamente. Caminhos comuns:
+
+- trocar de rede ou desativar VPN/proxy temporariamente
+- liberar `dl.google.com` e `maven.google.com` no firewall
+- configurar proxy do Gradle em `~/.gradle/gradle.properties`
+- abrir o Android Studio e rodar um Gradle Sync para baixar as dependencias pela IDE
+
 ## Build Android com EAS Cloud
 
 Faça login no Expo/EAS:
