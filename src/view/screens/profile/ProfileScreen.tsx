@@ -1,4 +1,6 @@
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import { Image } from 'expo-image';
+import * as ImagePicker from 'expo-image-picker';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import {
@@ -20,14 +22,18 @@ import {
   isAuthSessionError,
 } from '@/src/lib/api/campus';
 import { clearAuthToken } from '@/src/lib/auth/token';
+import { getProfileAvatarUri, saveProfileAvatarUri } from '@/src/lib/profile/avatar';
 
 export default function ProfileScreen() {
   const router = useRouter();
   const [user, setUser] = useState<CurrentUser | null>(null);
+  const [profileImageUri, setProfileImageUri] = useState<string | null>(null);
+  const [savedProfileImageUri, setSavedProfileImageUri] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const canManageEvents = user?.role === 'professor' || user?.role === 'admin';
+  const hasUnsavedProfileImage = profileImageUri !== savedProfileImageUri;
 
   const loadProfile = useCallback(async () => {
     if (!(await hasAuthToken())) {
@@ -41,7 +47,11 @@ export default function ProfileScreen() {
     setError(null);
 
     try {
-      setUser(await getCurrentUser());
+      const currentUser = await getCurrentUser();
+      const savedAvatarUri = await getProfileAvatarUri(currentUser.id);
+      setUser(currentUser);
+      setProfileImageUri(savedAvatarUri);
+      setSavedProfileImageUri(savedAvatarUri);
     } catch (profileError) {
       if (isAuthSessionError(profileError)) {
         await clearAuthToken();
@@ -70,8 +80,33 @@ export default function ProfileScreen() {
     router.replace('/login' as never);
   }
 
-  function handleUpdateProfile() {
-    Alert.alert('Perfil', 'Edição de dados será habilitada em uma próxima etapa.');
+  async function handleUpdateProfile() {
+    if (user && profileImageUri) {
+      await saveProfileAvatarUri(user.id, profileImageUri);
+      setSavedProfileImageUri(profileImageUri);
+    }
+
+    Alert.alert('Perfil salvo', 'A imagem e os dados do perfil foram atualizados neste dispositivo.');
+  }
+
+  async function handleChangeProfileImage() {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+    if (!permission.granted) {
+      Alert.alert('Permissão necessária', 'Permita o acesso à galeria para escolher a foto.');
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      allowsEditing: true,
+      aspect: [1, 1],
+      mediaTypes: ['images'],
+      quality: 0.9,
+    });
+
+    if (!result.canceled) {
+      setProfileImageUri(result.assets[0].uri);
+    }
   }
 
   return (
@@ -81,14 +116,26 @@ export default function ProfileScreen() {
         refreshControl={<RefreshControl refreshing={isLoading} onRefresh={loadProfile} />}
         showsVerticalScrollIndicator={false}>
         <View style={styles.profileHeader}>
-          <View style={styles.avatarOuter}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Alterar foto de perfil"
+            onPress={handleChangeProfileImage}
+            style={styles.avatarOuter}>
             <View style={styles.avatarInner}>
-              <MaterialIcons name="person" size={58} color="#3A281D" />
+              {profileImageUri ? (
+                <Image
+                  source={{ uri: profileImageUri }}
+                  contentFit="cover"
+                  style={styles.profileImage}
+                />
+              ) : (
+                <MaterialIcons name="person" size={76} color="#3A281D" />
+              )}
             </View>
             <View style={styles.editBadge}>
-              <MaterialIcons name="edit" size={12} color="#111111" />
+              <MaterialIcons name="edit" size={16} color="#111111" />
             </View>
-          </View>
+          </Pressable>
           <Text style={styles.title}>Meu Perfil</Text>
         </View>
 
@@ -135,6 +182,17 @@ export default function ProfileScreen() {
                 <Text style={styles.primaryButtonText}>Atualizar dados</Text>
               </Pressable>
             )}
+
+            {canManageEvents && hasUnsavedProfileImage ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Salvar foto de perfil"
+                onPress={handleUpdateProfile}
+                style={styles.secondaryButton}>
+                <MaterialIcons name="save" size={15} color="#4C535C" />
+                <Text style={styles.secondaryButtonText}>Salvar foto</Text>
+              </Pressable>
+            ) : null}
 
             <Pressable
               accessibilityRole="button"
@@ -190,45 +248,49 @@ const styles = StyleSheet.create({
   },
   content: {
     flexGrow: 1,
-    paddingBottom: 108,
+    paddingBottom: 102,
     paddingHorizontal: 22,
-    paddingTop: 18,
+    paddingTop: 12,
   },
   profileHeader: {
     alignItems: 'center',
-    marginBottom: 34,
+    marginBottom: 30,
     marginTop: 2,
   },
   avatarOuter: {
     alignItems: 'center',
     borderColor: '#FFCC00',
-    borderRadius: 14,
+    borderRadius: 18,
     borderWidth: 3,
-    height: 92,
+    height: 122,
     justifyContent: 'center',
-    width: 92,
+    width: 122,
   },
   avatarInner: {
     alignItems: 'center',
     backgroundColor: '#C59A70',
     borderColor: '#222222',
-    borderRadius: 10,
+    borderRadius: 14,
     borderWidth: 2,
-    height: 78,
+    height: 106,
     justifyContent: 'center',
     overflow: 'hidden',
-    width: 78,
+    width: 106,
+  },
+  profileImage: {
+    height: '100%',
+    width: '100%',
   },
   editBadge: {
     alignItems: 'center',
     backgroundColor: '#FFCC00',
-    borderRadius: 10,
-    bottom: 5,
-    height: 20,
+    borderRadius: 15,
+    bottom: 8,
+    height: 30,
     justifyContent: 'center',
     position: 'absolute',
-    right: 5,
-    width: 20,
+    right: 8,
+    width: 30,
   },
   title: {
     color: '#242424',
@@ -294,6 +356,22 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '900',
     letterSpacing: 0.9,
+    textTransform: 'uppercase',
+  },
+  secondaryButton: {
+    alignItems: 'center',
+    backgroundColor: '#E5E5E6',
+    borderRadius: 5,
+    flexDirection: 'row',
+    gap: 8,
+    height: 46,
+    justifyContent: 'center',
+  },
+  secondaryButtonText: {
+    color: '#4C535C',
+    fontSize: 12,
+    fontWeight: '900',
+    letterSpacing: 0.8,
     textTransform: 'uppercase',
   },
   signOutButton: {

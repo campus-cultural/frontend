@@ -7,6 +7,8 @@ import { HapticTab } from '@/components/haptic-tab';
 import { clearAuthToken } from '@/src/lib/auth/token';
 import { hasAuthToken } from '@/src/lib/api/campus';
 
+const TAB_ICON_SIZE = 20;
+
 export default function TabLayout() {
   const router = useRouter();
 
@@ -78,10 +80,10 @@ function TabItem({
 }) {
   return (
     <View style={[styles.tabPill, focused ? styles.tabPillActive : null]}>
-      <MaterialIcons name={icon} size={focused ? 24 : 23} color={focused ? '#111111' : '#A0A3AB'} />
+      <MaterialIcons name={icon} size={TAB_ICON_SIZE} color={focused ? '#111111' : '#A0A3AB'} />
       <Text
         adjustsFontSizeToFit
-        minimumFontScale={0.82}
+        minimumFontScale={0.9}
         numberOfLines={1}
         style={[styles.tabLabel, focused ? styles.tabLabelActive : null]}>
         {label}
@@ -98,10 +100,10 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 18,
     borderTopWidth: 1,
     elevation: 10,
-    height: 104,
-    paddingBottom: 18,
+    height: 92,
+    paddingBottom: 14,
     paddingHorizontal: 20,
-    paddingTop: 14,
+    paddingTop: 10,
     shadowColor: '#111111',
     shadowOffset: { width: 0, height: -6 },
     shadowOpacity: 0.08,
@@ -110,23 +112,23 @@ const styles = StyleSheet.create({
   tabBarItem: {
     alignItems: 'center',
     flex: 1,
-    height: 70,
+    height: 62,
     justifyContent: 'center',
   },
   tabBarIcon: {
     alignItems: 'center',
-    height: 70,
+    height: 62,
     justifyContent: 'center',
     width: '100%',
   },
   tabPill: {
     alignItems: 'center',
-    borderRadius: 22,
-    gap: 5,
-    height: 64,
+    borderRadius: 20,
+    gap: 4,
+    height: 56,
     justifyContent: 'center',
-    maxWidth: 122,
-    minWidth: 102,
+    maxWidth: 118,
+    minWidth: 98,
     paddingHorizontal: 10,
     width: '100%',
   },
@@ -135,9 +137,11 @@ const styles = StyleSheet.create({
   },
   tabLabel: {
     color: '#9B9EA5',
-    fontSize: 12,
-    fontWeight: '900',
-    letterSpacing: 1.3,
+    fontFamily: 'Space Grotesk',
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 1,
+    lineHeight: 15,
     textTransform: 'uppercase',
   },
   tabLabelActive: {
