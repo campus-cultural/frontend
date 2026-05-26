@@ -3,6 +3,7 @@ import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import * as Animatable from 'react-native-animatable';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -348,46 +349,59 @@ export default function NewEventScreen() {
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Voltar"
-            onPress={() =>
-              requestLeave(() => (router.canGoBack() ? router.back() : router.replace('/')))
-            }
-            style={styles.backButton}>
-            <MaterialIcons name="arrow-back" size={20} color="#FFCC00" />
-            <Text style={styles.backText}>Voltar</Text>
-          </Pressable>
+          <Animatable.View animation="fadeInLeft" duration={360} useNativeDriver>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Voltar"
+              onPress={() =>
+                requestLeave(() => (router.canGoBack() ? router.back() : router.replace('/')))
+              }
+              style={styles.backButton}>
+              <MaterialIcons name="arrow-back" size={20} color="#FFCC00" />
+              <Text style={styles.backText}>Voltar</Text>
+            </Pressable>
+          </Animatable.View>
 
           {isLoadingEvent ? (
-            <View style={styles.loadingEventBox}>
+            <Animatable.View
+              animation="pulse"
+              iterationCount="infinite"
+              style={styles.loadingEventBox}
+              useNativeDriver>
               <ActivityIndicator color="#111111" />
               <Text style={styles.loadingEventText}>Carregando evento...</Text>
-            </View>
+            </Animatable.View>
           ) : null}
 
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Selecionar imagem do evento"
-            onPress={openImagePicker}
-            style={styles.uploadCard}>
-            {form.imageUri ? (
-              <Image source={{ uri: form.imageUri }} style={styles.previewImage} contentFit="cover" />
-            ) : (
-              <View style={styles.uploadPlaceholder}>
-                <MaterialIcons name="image" size={36} color="#A6A6A6" />
-                <Text style={styles.uploadTitle}>Banner do evento</Text>
-                <Text style={styles.uploadHint}>Recomendado: 1920x820px</Text>
-                <View style={styles.uploadButton}>
-                  <Text style={styles.uploadButtonText}>Upload</Text>
+          <Animatable.View animation="fadeInUp" delay={80} duration={420} useNativeDriver>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Selecionar imagem do evento"
+              onPress={openImagePicker}
+              style={styles.uploadCard}>
+              {form.imageUri ? (
+                <Image source={{ uri: form.imageUri }} style={styles.previewImage} contentFit="cover" />
+              ) : (
+                <View style={styles.uploadPlaceholder}>
+                  <MaterialIcons name="image" size={36} color="#A6A6A6" />
+                  <Text style={styles.uploadTitle}>Banner do evento</Text>
+                  <Text style={styles.uploadHint}>Recomendado: 1920x820px</Text>
+                  <View style={styles.uploadButton}>
+                    <Text style={styles.uploadButtonText}>Upload</Text>
+                  </View>
                 </View>
-              </View>
-            )}
-          </Pressable>
+              )}
+            </Pressable>
+          </Animatable.View>
 
           {form.imageName ? <Text style={styles.imageName}>{form.imageName}</Text> : null}
 
-          <View style={styles.form}>
+          <Animatable.View
+            animation="fadeInUp"
+            delay={140}
+            duration={420}
+            style={styles.form}
+            useNativeDriver>
             <LabeledInput
               error={errors.name}
               label="Nome do Evento"
@@ -474,9 +488,14 @@ export default function NewEventScreen() {
                 <Text style={styles.limitWarning}>Limite máximo de caracteres atingido.</Text>
               ) : null}
             </View>
-          </View>
+          </Animatable.View>
 
-          <View style={styles.actions}>
+          <Animatable.View
+            animation="fadeInUp"
+            delay={220}
+            duration={420}
+            style={styles.actions}
+            useNativeDriver>
             <Pressable
               accessibilityRole="button"
               disabled={isSaving || isLoadingEvent}
@@ -508,13 +527,17 @@ export default function NewEventScreen() {
                 Descartar Rascunho
               </Text>
             </Pressable>
-          </View>
+          </Animatable.View>
         </ScrollView>
       </KeyboardAvoidingView>
 
       <Modal transparent animationType="fade" visible={isDatePopoverVisible}>
         <View style={styles.modalOverlay}>
-          <View style={styles.datePopover}>
+          <Animatable.View
+            animation="zoomIn"
+            duration={220}
+            style={styles.datePopover}
+            useNativeDriver>
             <View style={styles.popoverHeader}>
               <Text style={styles.popoverTitle}>Data e horário</Text>
               <Pressable
@@ -554,7 +577,7 @@ export default function NewEventScreen() {
                 <Text style={styles.popoverConfirmText}>Aplicar</Text>
               </Pressable>
             </View>
-          </View>
+          </Animatable.View>
         </View>
       </Modal>
 

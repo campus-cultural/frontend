@@ -1,4 +1,5 @@
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import * as Animatable from 'react-native-animatable';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 
 type UnsavedChangesDialogProps = {
@@ -19,7 +20,11 @@ export function UnsavedChangesDialog({
   return (
     <Modal transparent animationType="fade" visible={visible}>
       <View style={styles.overlay}>
-        <View style={styles.dialog}>
+        <Animatable.View
+          animation="zoomIn"
+          duration={220}
+          style={styles.dialog}
+          useNativeDriver>
           <View style={styles.iconBox}>
             <MaterialIcons name="warning" size={22} color="#111111" />
           </View>
@@ -32,7 +37,7 @@ export function UnsavedChangesDialog({
           <Pressable accessibilityRole="button" onPress={onDiscard} style={styles.secondaryButton}>
             <Text style={styles.secondaryText}>Descartar e sair</Text>
           </Pressable>
-        </View>
+        </Animatable.View>
       </View>
     </Modal>
   );

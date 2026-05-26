@@ -1,5 +1,6 @@
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
-import { StyleSheet, Text, View } from 'react-native';
+import * as Animatable from 'react-native-animatable';
+import { StyleSheet, Text } from 'react-native';
 
 export type AppToastType = 'error' | 'success' | 'warning';
 
@@ -22,10 +23,15 @@ export function AppToast({ bottom = 112, message, type = 'success', visible }: A
   }
 
   return (
-    <View pointerEvents="none" style={[styles.toast, styles[type], { bottom }]}>
+    <Animatable.View
+      animation="fadeInUp"
+      duration={240}
+      pointerEvents="none"
+      style={[styles.toast, styles[type], { bottom }]}
+      useNativeDriver>
       <MaterialIcons name={iconByType[type]} size={18} color="#111111" />
       <Text style={styles.text}>{message}</Text>
-    </View>
+    </Animatable.View>
   );
 }
 

@@ -1,6 +1,7 @@
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
+import * as Animatable from 'react-native-animatable';
 import {
   ActivityIndicator,
   Alert,
@@ -67,13 +68,22 @@ export default function LoginScreen() {
         behavior={Platform.select({ ios: 'padding', default: undefined })}
         style={styles.container}>
         <View style={styles.content}>
-          <View style={styles.logoBlock}>
+          <Animatable.View
+            animation="zoomIn"
+            duration={460}
+            style={styles.logoBlock}
+            useNativeDriver>
             <Image source={logoUtf} resizeMode="contain" style={styles.logoImage} />
             <Text style={styles.brand}>UTFPR CULTURAL</Text>
             <Text style={styles.subtitle}>ACESSO INSTITUCIONAL</Text>
-          </View>
+          </Animatable.View>
 
-          <View style={styles.card}>
+          <Animatable.View
+            animation="fadeInUp"
+            delay={140}
+            duration={460}
+            style={styles.card}
+            useNativeDriver>
             <View>
               <Text style={styles.label}>Email *</Text>
               <View style={[styles.inputLine, focusedField === 'email' ? styles.inputLineFocused : null]}>
@@ -111,14 +121,16 @@ export default function LoginScreen() {
               </View>
             </View>
 
-            <Pressable
-              accessibilityRole="button"
-              disabled={isLoading}
-              onPress={handleLogin}
-              style={[styles.loginButton, isLoading ? styles.loginButtonDisabled : null]}>
-              {isLoading ? <ActivityIndicator color="#111111" /> : null}
-              <Text style={styles.loginButtonText}>Entrar</Text>
-            </Pressable>
+            <Animatable.View animation="fadeIn" delay={300} useNativeDriver>
+              <Pressable
+                accessibilityRole="button"
+                disabled={isLoading}
+                onPress={handleLogin}
+                style={[styles.loginButton, isLoading ? styles.loginButtonDisabled : null]}>
+                {isLoading ? <ActivityIndicator color="#111111" /> : null}
+                <Text style={styles.loginButtonText}>Entrar</Text>
+              </Pressable>
+            </Animatable.View>
 
             <View style={styles.cardActions}>
               <Pressable accessibilityRole="button" onPress={() => router.push('/cadastro' as never)}>
@@ -128,7 +140,7 @@ export default function LoginScreen() {
                 <Text style={styles.cardActionText}>Esqueceu a senha</Text>
               </Pressable>
             </View>
-          </View>
+          </Animatable.View>
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>

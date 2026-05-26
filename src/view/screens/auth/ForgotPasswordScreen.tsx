@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
+import * as Animatable from 'react-native-animatable';
 import {
   KeyboardAvoidingView,
   Modal,
@@ -75,26 +76,50 @@ export default function ForgotPasswordScreen() {
         behavior={Platform.select({ ios: 'padding', default: undefined })}
         style={styles.keyboardView}>
         <View style={styles.container}>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Voltar"
-            onPress={() => (router.canGoBack() ? router.back() : router.replace('/login' as never))}
-            style={styles.header}>
-            <Ionicons name="arrow-back" size={20} color="#FFC107" />
-            <Text style={styles.headerText}>Voltar</Text>
-          </Pressable>
+          <Animatable.View animation="fadeInLeft" duration={360} useNativeDriver>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Voltar"
+              onPress={() => (router.canGoBack() ? router.back() : router.replace('/login' as never))}
+              style={styles.header}>
+              <Ionicons name="arrow-back" size={20} color="#FFC107" />
+              <Text style={styles.headerText}>Voltar</Text>
+            </Pressable>
+          </Animatable.View>
 
-          <View style={styles.badgeContainer}>
+          <Animatable.View
+            animation="fadeIn"
+            delay={100}
+            duration={360}
+            style={styles.badgeContainer}
+            useNativeDriver>
             <Text style={styles.badgeText}>Segurança</Text>
-          </View>
+          </Animatable.View>
 
-          <Text style={styles.title}>Esqueceu{'\n'}sua senha?</Text>
+          <Animatable.Text
+            animation="fadeInUp"
+            delay={140}
+            duration={420}
+            style={styles.title}
+            useNativeDriver>
+            Esqueceu{'\n'}sua senha?
+          </Animatable.Text>
 
-          <Text style={styles.description}>
+          <Animatable.Text
+            animation="fadeInUp"
+            delay={200}
+            duration={420}
+            style={styles.description}
+            useNativeDriver>
             Insira o e-mail cadastrado para receber as instruções de recuperação.
-          </Text>
+          </Animatable.Text>
 
-          <View style={styles.inputWrapper}>
+          <Animatable.View
+            animation="fadeInUp"
+            delay={260}
+            duration={420}
+            style={styles.inputWrapper}
+            useNativeDriver>
             <Text style={styles.inputLabel}>
               E-mail <Text style={styles.requiredAsterisk}>*</Text>
             </Text>
@@ -123,12 +148,14 @@ export default function ForgotPasswordScreen() {
               />
             </View>
             {emailError ? <Text style={styles.errorText}>{emailError}</Text> : null}
-          </View>
+          </Animatable.View>
 
-          <Pressable accessibilityRole="button" onPress={handleSend} style={styles.primaryButton}>
-            <Text style={styles.primaryButtonText}>Enviar</Text>
-            <Ionicons name="arrow-forward" size={20} color="#000000" />
-          </Pressable>
+          <Animatable.View animation="fadeInUp" delay={320} duration={420} useNativeDriver>
+            <Pressable accessibilityRole="button" onPress={handleSend} style={styles.primaryButton}>
+              <Text style={styles.primaryButtonText}>Enviar</Text>
+              <Ionicons name="arrow-forward" size={20} color="#000000" />
+            </Pressable>
+          </Animatable.View>
         </View>
       </KeyboardAvoidingView>
 
@@ -146,7 +173,11 @@ function FeedbackModal({ modal, onClose }: FeedbackModalProps) {
   return (
     <Modal transparent animationType="fade" visible={modal.visible} onRequestClose={onClose}>
       <View style={styles.modalOverlay}>
-        <View style={styles.modalCard}>
+        <Animatable.View
+          animation="zoomIn"
+          duration={220}
+          style={styles.modalCard}
+          useNativeDriver>
           <View
             style={[
               styles.modalIconBox,
@@ -165,7 +196,7 @@ function FeedbackModal({ modal, onClose }: FeedbackModalProps) {
             ]}>
             <Text style={styles.modalButtonText}>OK</Text>
           </Pressable>
-        </View>
+        </Animatable.View>
       </View>
     </Modal>
   );

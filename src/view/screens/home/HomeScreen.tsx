@@ -2,6 +2,7 @@ import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { Image } from 'expo-image';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
+import * as Animatable from 'react-native-animatable';
 import {
   ActivityIndicator,
   Pressable,
@@ -66,13 +67,23 @@ export default function HomeScreen() {
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <Text style={styles.headerTitle}>UTFPR CULTURA</Text>
+        <Animatable.Text
+          animation="fadeInDown"
+          duration={420}
+          style={styles.headerTitle}
+          useNativeDriver>
+          UTFPR CULTURA
+        </Animatable.Text>
 
         {isLoading ? (
-          <View style={styles.loadingRow}>
+          <Animatable.View
+            animation="pulse"
+            iterationCount="infinite"
+            style={styles.loadingRow}
+            useNativeDriver>
             <ActivityIndicator color="#111111" />
             <Text style={styles.loadingText}>Atualizando eventos...</Text>
-          </View>
+          </Animatable.View>
         ) : null}
 
         {events.map((event, index) => (
@@ -80,7 +91,13 @@ export default function HomeScreen() {
         ))}
 
         {!isLoading && events.length === 0 ? (
-          <Text style={styles.emptyText}>Nenhum evento disponível no momento.</Text>
+          <Animatable.Text
+            animation="fadeIn"
+            duration={360}
+            style={styles.emptyText}
+            useNativeDriver>
+            Nenhum evento disponível no momento.
+          </Animatable.Text>
         ) : null}
       </ScrollView>
     </SafeAreaView>
@@ -98,7 +115,12 @@ function EventCard({
   const imageUri = getEventImageUri(event.image);
 
   return (
-    <View style={styles.card}>
+    <Animatable.View
+      animation="fadeInUp"
+      delay={index * 90}
+      duration={420}
+      style={styles.card}
+      useNativeDriver>
       <View style={[styles.eventVisual, index % 2 ? styles.artVisual : styles.musicVisual]}>
         {imageUri ? (
           <Image source={{ uri: imageUri }} contentFit="cover" style={styles.eventImage} />
@@ -126,13 +148,15 @@ function EventCard({
         <Text numberOfLines={2} style={styles.eventDescription}>
           {event.description}
         </Text>
-        <Pressable
-          accessibilityRole="button"
-          style={[styles.eventButton, isSubscribed ? styles.eventButtonSubscribed : null]}>
-          <Text style={styles.eventButtonText}>{isSubscribed ? 'Inscrito' : 'Inscrever-se'}</Text>
-        </Pressable>
+        <Animatable.View animation="fadeIn" delay={index * 90 + 180} useNativeDriver>
+          <Pressable
+            accessibilityRole="button"
+            style={[styles.eventButton, isSubscribed ? styles.eventButtonSubscribed : null]}>
+            <Text style={styles.eventButtonText}>{isSubscribed ? 'Inscrito' : 'Inscrever-se'}</Text>
+          </Pressable>
+        </Animatable.View>
       </View>
-    </View>
+    </Animatable.View>
   );
 }
 

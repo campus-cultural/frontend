@@ -1,4 +1,5 @@
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import * as Animatable from 'react-native-animatable';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -12,30 +13,49 @@ export default function CalendarScreen() {
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <View style={styles.header}>
+        <Animatable.View
+          animation="fadeInDown"
+          duration={360}
+          style={styles.header}
+          useNativeDriver>
           <View style={styles.headerSpacer} />
           <Text style={styles.headerTitle}>Agenda</Text>
           <MaterialIcons name="search" size={20} color="#111111" />
-        </View>
+        </Animatable.View>
 
-        <View style={styles.monthRow}>
+        <Animatable.View
+          animation="fadeInLeft"
+          delay={80}
+          duration={360}
+          style={styles.monthRow}
+          useNativeDriver>
           <Text style={styles.monthTitle}>Abril 2026</Text>
           <View style={styles.monthActions}>
             <MaterialIcons name="chevron-left" size={18} color="#69707A" />
             <MaterialIcons name="chevron-right" size={18} color="#69707A" />
           </View>
-        </View>
+        </Animatable.View>
 
-        <View style={styles.filters}>
+        <Animatable.View
+          animation="fadeIn"
+          delay={140}
+          duration={360}
+          style={styles.filters}
+          useNativeDriver>
           <View style={[styles.filterPill, styles.filterPillActive]}>
             <Text style={[styles.filterText, styles.filterTextActive]}>Todos</Text>
           </View>
           <View style={styles.filterPill}>
             <Text style={styles.filterText}>Inscritos</Text>
           </View>
-        </View>
+        </Animatable.View>
 
-        <View style={styles.calendarCard}>
+        <Animatable.View
+          animation="fadeInUp"
+          delay={180}
+          duration={420}
+          style={styles.calendarCard}
+          useNativeDriver>
           <View style={styles.weekRow}>
             {weekDays.map((day, index) => (
               <Text key={`${day}-${index}`} style={styles.weekDay}>
@@ -60,13 +80,20 @@ export default function CalendarScreen() {
               );
             })}
           </View>
-        </View>
+        </Animatable.View>
 
-        <Text style={styles.dayTitle}>13 de Abril de 2026</Text>
+        <Animatable.Text
+          animation="fadeIn"
+          delay={260}
+          duration={360}
+          style={styles.dayTitle}
+          useNativeDriver>
+          13 de Abril de 2026
+        </Animatable.Text>
 
         <View style={styles.eventList}>
           {mockAgendaEvents.map((event, index) => (
-            <AgendaCard event={event} isSubscribed={index === 0} key={event.id} />
+            <AgendaCard event={event} index={index} isSubscribed={index === 0} key={event.id} />
           ))}
         </View>
       </ScrollView>
@@ -74,9 +101,22 @@ export default function CalendarScreen() {
   );
 }
 
-function AgendaCard({ event, isSubscribed }: { event: CampusEvent; isSubscribed: boolean }) {
+function AgendaCard({
+  event,
+  index,
+  isSubscribed,
+}: {
+  event: CampusEvent;
+  index: number;
+  isSubscribed: boolean;
+}) {
   return (
-    <View style={styles.agendaCard}>
+    <Animatable.View
+      animation="fadeInUp"
+      delay={320 + index * 90}
+      duration={420}
+      style={styles.agendaCard}
+      useNativeDriver>
       <View style={styles.agendaAccent} />
       <View style={styles.agendaContent}>
         <View style={styles.agendaTop}>
@@ -92,7 +132,7 @@ function AgendaCard({ event, isSubscribed }: { event: CampusEvent; isSubscribed:
           <Text style={styles.agendaMetaText}>{event.event_location}</Text>
         </View>
       </View>
-    </View>
+    </Animatable.View>
   );
 }
 

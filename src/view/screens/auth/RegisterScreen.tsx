@@ -1,6 +1,7 @@
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
+import * as Animatable from 'react-native-animatable';
 import {
   ActivityIndicator,
   Alert,
@@ -201,16 +202,23 @@ export default function RegisterScreen() {
           contentContainerStyle={styles.content}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Voltar"
-            onPress={() => (router.canGoBack() ? router.back() : router.replace('/login' as never))}
-            style={styles.backButton}>
-            <MaterialIcons name="arrow-back" size={22} color="#FFCC00" />
-            <Text style={styles.backText}>Voltar</Text>
-          </Pressable>
+          <Animatable.View animation="fadeInLeft" duration={360} useNativeDriver>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Voltar"
+              onPress={() => (router.canGoBack() ? router.back() : router.replace('/login' as never))}
+              style={styles.backButton}>
+              <MaterialIcons name="arrow-back" size={22} color="#FFCC00" />
+              <Text style={styles.backText}>Voltar</Text>
+            </Pressable>
+          </Animatable.View>
 
-          <View style={styles.roleSelector}>
+          <Animatable.View
+            animation="fadeInDown"
+            delay={80}
+            duration={360}
+            style={styles.roleSelector}
+            useNativeDriver>
             <RoleButton
               isActive={form.role === 'student'}
               label="Aluno"
@@ -227,9 +235,14 @@ export default function RegisterScreen() {
                 setErrors({});
               }}
             />
-          </View>
+          </Animatable.View>
 
-          <View style={styles.form}>
+          <Animatable.View
+            animation="fadeInUp"
+            delay={140}
+            duration={420}
+            style={styles.form}
+            useNativeDriver>
             {isStudent ? (
               <FormInput
                 error={errors.fullName}
@@ -311,22 +324,28 @@ export default function RegisterScreen() {
               secureTextEntry
               value={form.confirmPassword}
             />
-          </View>
+          </Animatable.View>
 
-          <Pressable
-            accessibilityRole="button"
-            disabled={isSaving}
-            onPress={handleRegister}
-            style={[styles.submitButton, isSaving ? styles.submitButtonDisabled : null]}>
-            {isSaving ? <ActivityIndicator color="#111111" /> : null}
-            <Text style={styles.submitButtonText}>Cadastrar</Text>
-          </Pressable>
+          <Animatable.View animation="fadeInUp" delay={220} duration={420} useNativeDriver>
+            <Pressable
+              accessibilityRole="button"
+              disabled={isSaving}
+              onPress={handleRegister}
+              style={[styles.submitButton, isSaving ? styles.submitButtonDisabled : null]}>
+              {isSaving ? <ActivityIndicator color="#111111" /> : null}
+              <Text style={styles.submitButtonText}>Cadastrar</Text>
+            </Pressable>
+          </Animatable.View>
         </ScrollView>
       </KeyboardAvoidingView>
 
       <Modal transparent animationType="fade" visible={showBirthPicker}>
         <View style={styles.modalOverlay}>
-          <View style={styles.datePopover}>
+          <Animatable.View
+            animation="zoomIn"
+            duration={220}
+            style={styles.datePopover}
+            useNativeDriver>
             <View style={styles.popoverHeader}>
               <Text style={styles.popoverTitle}>Data de nascimento</Text>
               <Pressable
@@ -365,7 +384,7 @@ export default function RegisterScreen() {
                 <Text style={styles.popoverConfirmText}>Aplicar</Text>
               </Pressable>
             </View>
-          </View>
+          </Animatable.View>
         </View>
       </Modal>
     </SafeAreaView>

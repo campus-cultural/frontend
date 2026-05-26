@@ -231,28 +231,6 @@ O EAS local exige Android SDK/NDK configurado na máquina. No Windows, a Expo re
 
 Evite commitar as pastas nativas geradas (`android/`, `ios/`) sem alinhamento com o time.
 
-## Build Android com EAS Cloud
-
-Faça login no Expo/EAS:
-
-```bash
-npx eas login
-```
-
-Build APK interno para teste:
-
-```bash
-npm run build:android:preview
-```
-
-Build de produção:
-
-```bash
-npm run build:android:production
-```
-
-Por padrão, o perfil `production` gera AAB para distribuição em loja. Para instalar diretamente em aparelho/emulador, use o perfil `preview`, que gera APK.
-
 ## Estrutura do Projeto
 
 ```text

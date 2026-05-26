@@ -3,6 +3,7 @@ import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import * as Animatable from 'react-native-animatable';
 import {
   ActivityIndicator,
   Pressable,
@@ -215,7 +216,11 @@ export default function ProfileScreen() {
         contentContainerStyle={styles.content}
         refreshControl={<RefreshControl refreshing={isLoading} onRefresh={loadProfile} />}
         showsVerticalScrollIndicator={false}>
-        <View style={styles.profileHeader}>
+        <Animatable.View
+          animation="zoomIn"
+          duration={440}
+          style={styles.profileHeader}
+          useNativeDriver>
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Alterar foto de perfil"
@@ -237,45 +242,52 @@ export default function ProfileScreen() {
             </View>
           </Pressable>
           <Text style={styles.title}>Meu Perfil</Text>
-        </View>
+        </Animatable.View>
 
         {isLoading ? (
-          <View style={styles.feedbackBox}>
+          <Animatable.View
+            animation="pulse"
+            iterationCount="infinite"
+            style={styles.feedbackBox}
+            useNativeDriver>
             <ActivityIndicator color="#111111" />
             <Text style={styles.feedbackText}>Carregando perfil...</Text>
-          </View>
+          </Animatable.View>
         ) : null}
 
         {!isLoading && error ? (
-          <View style={styles.feedbackBox}>
+          <Animatable.View animation="fadeIn" duration={320} style={styles.feedbackBox} useNativeDriver>
             <MaterialIcons name="warning" size={22} color="#B45309" />
             <Text style={styles.feedbackText}>{error}</Text>
-          </View>
+          </Animatable.View>
         ) : null}
 
         {user ? (
           <View style={styles.profileBody}>
             <ProfileField
               editable
+              delay={80}
               label="Nome"
               onChangeText={(value) => updateUserField('name', value)}
               value={user.name}
             />
             <ProfileField
               editable
+              delay={140}
               label="Sobrenome"
               onChangeText={(value) => updateUserField('last_name', value)}
               value={user.last_name}
             />
             <ProfileField
               editable
+              delay={200}
               label="E-mail institucional"
               onChangeText={(value) => updateUserField('email', value)}
               value={user.email}
             />
-            <ProfileField label="Conta" value={roleLabel(user.role).toUpperCase()} />
+            <ProfileField delay={260} label="Conta" value={roleLabel(user.role).toUpperCase()} />
             {user.role === 'student' && user.ra ? (
-              <ProfileField label="RA" value={user.ra} />
+              <ProfileField delay={320} label="RA" value={user.ra} />
             ) : null}
 
             {canManageEvents ? (
@@ -295,9 +307,10 @@ export default function ProfileScreen() {
                 </View>
 
                 {filteredProfessorEvents.length ? (
-                  filteredProfessorEvents.map((event) => (
+                  filteredProfessorEvents.map((event, index) => (
                     <EditableEventCard
                       event={event}
+                      index={index}
                       key={event.id}
                       onSelect={() =>
                         requestLeave(() =>
@@ -315,45 +328,53 @@ export default function ProfileScreen() {
               </View>
             ) : null}
 
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Atualizar dados"
-              onPress={handleUpdateProfile}
-              style={styles.primaryButton}>
-              <MaterialIcons name="save" size={15} color="#111111" />
-              <Text style={styles.primaryButtonText}>Atualizar dados</Text>
-            </Pressable>
-
-            {canManageEvents ? (
+            <Animatable.View animation="fadeInUp" delay={320} duration={360} useNativeDriver>
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel="Cadastrar novo evento"
-                onPress={() => requestLeave(() => router.push('/novo-evento'))}
-                style={[styles.primaryButton, styles.createEventButton]}>
-                <MaterialIcons name="add" size={17} color="#111111" />
-                <Text style={styles.primaryButtonText}>Cadastrar evento</Text>
+                accessibilityLabel="Atualizar dados"
+                onPress={handleUpdateProfile}
+                style={styles.primaryButton}>
+                <MaterialIcons name="save" size={15} color="#111111" />
+                <Text style={styles.primaryButtonText}>Atualizar dados</Text>
               </Pressable>
+            </Animatable.View>
+
+            {canManageEvents ? (
+              <Animatable.View animation="fadeInUp" delay={380} duration={360} useNativeDriver>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Cadastrar novo evento"
+                  onPress={() => requestLeave(() => router.push('/novo-evento'))}
+                  style={[styles.primaryButton, styles.createEventButton]}>
+                  <MaterialIcons name="add" size={17} color="#111111" />
+                  <Text style={styles.primaryButtonText}>Cadastrar evento</Text>
+                </Pressable>
+              </Animatable.View>
             ) : null}
 
             {canManageEvents && hasUnsavedProfileImage ? (
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Salvar foto de perfil"
-                onPress={handleUpdateProfile}
-                style={styles.secondaryButton}>
-                <MaterialIcons name="save" size={15} color="#4C535C" />
-                <Text style={styles.secondaryButtonText}>Salvar foto</Text>
-              </Pressable>
+              <Animatable.View animation="fadeInUp" duration={260} useNativeDriver>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Salvar foto de perfil"
+                  onPress={handleUpdateProfile}
+                  style={styles.secondaryButton}>
+                  <MaterialIcons name="save" size={15} color="#4C535C" />
+                  <Text style={styles.secondaryButtonText}>Salvar foto</Text>
+                </Pressable>
+              </Animatable.View>
             ) : null}
 
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Sair da conta"
-              onPress={() => requestLeave(() => void handleSignOut())}
-              style={styles.signOutButton}>
-              <MaterialIcons name="logout" size={15} color="#676C74" />
-              <Text style={styles.signOutText}>Sair da conta</Text>
-            </Pressable>
+            <Animatable.View animation="fadeInUp" delay={440} duration={360} useNativeDriver>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Sair da conta"
+                onPress={() => requestLeave(() => void handleSignOut())}
+                style={styles.signOutButton}>
+                <MaterialIcons name="logout" size={15} color="#676C74" />
+                <Text style={styles.signOutText}>Sair da conta</Text>
+              </Pressable>
+            </Animatable.View>
           </View>
         ) : null}
       </ScrollView>
@@ -368,46 +389,63 @@ export default function ProfileScreen() {
   );
 }
 
-function EditableEventCard({ event, onSelect }: { event: CampusEvent; onSelect: () => void }) {
+function EditableEventCard({
+  event,
+  index,
+  onSelect,
+}: {
+  event: CampusEvent;
+  index: number;
+  onSelect: () => void;
+}) {
   const eventDate = new Date(event.event_datetime);
 
   return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={`Editar evento ${event.name}`}
-      onPress={onSelect}
-      style={styles.editableEventCard}>
-      <View style={styles.eventAccent} />
-      <View style={styles.editableEventContent}>
-        <View style={styles.editableEventTop}>
-          <Text numberOfLines={2} style={styles.editableEventTitle}>
-            {event.name}
-          </Text>
-          <MaterialIcons name="edit" size={16} color="#8A8D94" />
-        </View>
-        <View style={styles.eventMeta}>
-          <View style={styles.eventMetaItem}>
-            <MaterialIcons name="schedule" size={12} color="#6F7782" />
-            <Text style={styles.eventMetaText}>{formatEventTime(eventDate)}</Text>
-          </View>
-          <View style={styles.eventMetaItem}>
-            <MaterialIcons name="place" size={12} color="#6F7782" />
-            <Text numberOfLines={1} style={styles.eventMetaText}>
-              {event.event_location}
+    <Animatable.View
+      animation="fadeInUp"
+      delay={index * 80}
+      duration={360}
+      style={styles.editableEventCard}
+      useNativeDriver>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`Editar evento ${event.name}`}
+        onPress={onSelect}
+        style={styles.editableEventButton}>
+        <View style={styles.eventAccent} />
+        <View style={styles.editableEventContent}>
+          <View style={styles.editableEventTop}>
+            <Text numberOfLines={2} style={styles.editableEventTitle}>
+              {event.name}
             </Text>
+            <MaterialIcons name="edit" size={16} color="#8A8D94" />
+          </View>
+          <View style={styles.eventMeta}>
+            <View style={styles.eventMetaItem}>
+              <MaterialIcons name="schedule" size={12} color="#6F7782" />
+              <Text style={styles.eventMetaText}>{formatEventTime(eventDate)}</Text>
+            </View>
+            <View style={styles.eventMetaItem}>
+              <MaterialIcons name="place" size={12} color="#6F7782" />
+              <Text numberOfLines={1} style={styles.eventMetaText}>
+                {event.event_location}
+              </Text>
+            </View>
           </View>
         </View>
-      </View>
-    </Pressable>
+      </Pressable>
+    </Animatable.View>
   );
 }
 
 function ProfileField({
+  delay = 0,
   editable,
   label,
   onChangeText,
   value,
 }: {
+  delay?: number;
   editable?: boolean;
   label: string;
   onChangeText?: (value: string) => void;
@@ -417,7 +455,12 @@ function ProfileField({
   const inputRef = useRef<TextInput>(null);
 
   return (
-    <View style={styles.fieldGroup}>
+    <Animatable.View
+      animation="fadeInUp"
+      delay={delay}
+      duration={360}
+      style={styles.fieldGroup}
+      useNativeDriver>
       <Text style={styles.fieldLabel}>{label}</Text>
       <Pressable
         disabled={!editable}
@@ -435,7 +478,7 @@ function ProfileField({
         />
         {editable ? <MaterialIcons name="edit" size={14} color="#8A8D94" /> : null}
       </Pressable>
-    </View>
+    </Animatable.View>
   );
 }
 
@@ -567,7 +610,6 @@ const styles = StyleSheet.create({
   editableEventCard: {
     backgroundColor: '#FFFFFF',
     borderRadius: 8,
-    flexDirection: 'row',
     minHeight: 78,
     overflow: 'hidden',
     shadowColor: '#111111',
@@ -575,6 +617,10 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.04,
     shadowRadius: 14,
     elevation: 1,
+  },
+  editableEventButton: {
+    flex: 1,
+    flexDirection: 'row',
   },
   eventAccent: {
     backgroundColor: '#FFCC00',
