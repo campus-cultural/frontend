@@ -1,11 +1,9 @@
-import { Platform } from 'react-native';
 import { jwtDecode } from 'jwt-decode';
 
 import { getAuthToken, saveAuthToken } from '@/src/lib/auth/token';
+import { env } from '@/src/lib/config/env';
 
-export const API_BASE_URL =
-  process.env.EXPO_PUBLIC_API_URL ??
-  (Platform.OS === 'android' ? 'http://10.0.2.2:8000' : 'http://127.0.0.1:8000');
+export const API_BASE_URL = env.apiBaseUrl;
 
 export type UserRole = 'student' | 'professor' | 'admin';
 
@@ -69,45 +67,19 @@ export async function hasAuthToken() {
 }
 
 export async function login(payload: LoginPayload) {
-  const response = await fetch(`${API_BASE_URL}/users/login`, {
+  const response = await requestPublic<TokenOut>('/users/login', {
     body: JSON.stringify(payload),
-    headers: {
-      Accept: 'application/json',
-      'Content-Type': 'application/json',
-    },
     method: 'POST',
   });
-
-  if (!response.ok) {
-    if (response.status === 401) {
-      throw new Error('E-mail ou senha inválidos.');
-    }
-
-    const message = await response.text();
-    throw new Error(message || `A API respondeu com status ${response.status}.`);
-  }
-
-  const token = (await response.json()) as TokenOut;
-  await saveAuthToken(token.access_token);
-  return token;
+  await saveAuthToken(response.access_token);
+  return response;
 }
 
 export async function registerUser(payload: RegisterUserPayload) {
-  const response = await fetch(`${API_BASE_URL}/users/register`, {
+  return requestPublic<CurrentUser>('/users/register', {
     body: JSON.stringify(payload),
-    headers: {
-      Accept: 'application/json',
-      'Content-Type': 'application/json',
-    },
     method: 'POST',
   });
-
-  if (!response.ok) {
-    const message = await response.text();
-    throw new Error(message || `A API respondeu com status ${response.status}.`);
-  }
-
-  return (await response.json()) as CurrentUser;
 }
 
 export async function getCurrentUser() {
@@ -143,23 +115,39 @@ async function request<T>(path: string, init?: RequestInit) {
     throw new Error('Faça login para autenticar com o backend.');
   }
 
+  return requestJson<T>(path, {
+    ...init,
+    headers: {
+      Authorization: `Bearer ${authToken}`,
+      ...init?.headers,
+    },
+  });
+}
+
+async function requestPublic<T>(path: string, init?: RequestInit) {
+  return requestJson<T>(path, init);
+}
+
+async function requestJson<T>(path: string, init?: RequestInit) {
   const response = await fetch(`${API_BASE_URL}${path}`, {
     ...init,
     headers: {
       Accept: 'application/json',
-      Authorization: `Bearer ${authToken}`,
       'Content-Type': 'application/json',
       ...init?.headers,
     },
   });
 
   if (!response.ok) {
+    if (response.status === 401 && path === '/users/login') {
+      throw new Error('E-mail ou senha inválidos.');
+    }
+
     if (response.status === 404 && path.startsWith('/events')) {
       throw new Error('Use a branch feature/events-table do backend para habilitar /events.');
     }
 
-    const message = await response.text();
-    throw new Error(message || `A API respondeu com status ${response.status}.`);
+    throw new Error(await getSafeErrorMessage(response, path));
   }
 
   if (response.status === 204) {
@@ -167,4 +155,27 @@ async function request<T>(path: string, init?: RequestInit) {
   }
 
   return (await response.json()) as T;
+}
+
+async function getSafeErrorMessage(response: Response, path: string) {
+  const fallbackMessage = getFallbackErrorMessage(path);
+
+  if (!__DEV__) {
+    return fallbackMessage;
+  }
+
+  const responseText = await response.text();
+  return responseText || `${fallbackMessage} Status: ${response.status}.`;
+}
+
+function getFallbackErrorMessage(path: string) {
+  if (path === '/users/register') {
+    return 'Não foi possível concluir o cadastro. Revise os dados e tente novamente.';
+  }
+
+  if (path.startsWith('/events')) {
+    return 'Não foi possível carregar ou salvar eventos. Tente novamente.';
+  }
+
+  return 'Não foi possível concluir a solicitação. Tente novamente.';
 }

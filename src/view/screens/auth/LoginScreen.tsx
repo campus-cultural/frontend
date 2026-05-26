@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Image,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -16,7 +17,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { getAuthToken } from '@/src/lib/auth/token';
 import { login } from '@/src/lib/api/campus';
-import { UtfprLogo } from '@/src/view/com/auth/UtfprLogo';
+
+const logoUtf = require('@/assets/logoUTF.png');
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -64,7 +66,7 @@ export default function LoginScreen() {
         style={styles.container}>
         <View style={styles.content}>
           <View style={styles.logoBlock}>
-            <UtfprLogo />
+            <Image source={logoUtf} resizeMode="contain" style={styles.logoImage} />
             <Text style={styles.brand}>UTFPR CULTURAL</Text>
             <Text style={styles.subtitle}>ACESSO INSTITUCIONAL</Text>
           </View>
@@ -144,6 +146,10 @@ const styles = StyleSheet.create({
   logoBlock: {
     alignItems: 'center',
     marginBottom: 34,
+  },
+  logoImage: {
+    height: 96,
+    width: 260,
   },
   brand: {
     color: '#202020',
