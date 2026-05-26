@@ -14,8 +14,9 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { getAuthToken } from '@/services/auth-token';
-import { login } from '@/services/campus-api';
+import { getAuthToken } from '@/src/lib/auth/token';
+import { login } from '@/src/lib/api/campus';
+import { UtfprLogo } from '@/src/view/com/auth/UtfprLogo';
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -115,7 +116,7 @@ export default function LoginScreen() {
               <Pressable accessibilityRole="button" onPress={() => router.push('/cadastro' as never)}>
                 <Text style={styles.cardActionText}>Cadastrar</Text>
               </Pressable>
-              <Pressable accessibilityRole="button">
+              <Pressable accessibilityRole="button" onPress={() => router.push('/esqueceu-senha' as never)}>
                 <Text style={styles.cardActionText}>Esqueceu a senha</Text>
               </Pressable>
             </View>
@@ -123,16 +124,6 @@ export default function LoginScreen() {
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
-  );
-}
-
-function UtfprLogo() {
-  return (
-    <View style={styles.logo}>
-      <Text style={styles.logoText}>UTFPR</Text>
-      <View style={styles.logoAccent} />
-      <Text style={styles.logoCaption}>UNIVERSIDADE TECNOLÓGICA FEDERAL DO PARANÁ</Text>
-    </View>
   );
 }
 
@@ -153,30 +144,6 @@ const styles = StyleSheet.create({
   logoBlock: {
     alignItems: 'center',
     marginBottom: 34,
-  },
-  logo: {
-    alignItems: 'center',
-  },
-  logoText: {
-    color: '#050505',
-    fontSize: 58,
-    fontWeight: '900',
-    letterSpacing: 0,
-    lineHeight: 62,
-  },
-  logoAccent: {
-    backgroundColor: '#FFCC00',
-    height: 28,
-    marginLeft: 42,
-    marginTop: -38,
-    width: 38,
-    zIndex: -1,
-  },
-  logoCaption: {
-    color: '#111111',
-    fontSize: 7,
-    fontWeight: '900',
-    marginTop: 12,
   },
   brand: {
     color: '#202020',

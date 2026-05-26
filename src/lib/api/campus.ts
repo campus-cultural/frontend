@@ -1,7 +1,7 @@
 import { Platform } from 'react-native';
 import { jwtDecode } from 'jwt-decode';
 
-import { getAuthToken, saveAuthToken } from './auth-token';
+import { getAuthToken, saveAuthToken } from '@/src/lib/auth/token';
 
 export const API_BASE_URL =
   process.env.EXPO_PUBLIC_API_URL ??

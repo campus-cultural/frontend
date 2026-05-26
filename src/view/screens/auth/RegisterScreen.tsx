@@ -16,7 +16,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { login, registerUser, UserRole } from '@/services/campus-api';
+import { login, registerUser, UserRole } from '@/src/lib/api/campus';
 
 type RegisterRole = Exclude<UserRole, 'admin'>;
 
@@ -80,21 +80,27 @@ export default function RegisterScreen() {
     if (isStudent) {
       if (fullNameParts.length < 2) {
         nextErrors.fullName = 'Informe nome e sobrenome';
+      } else if (!hasOnlyLetters(form.fullName)) {
+        nextErrors.fullName = 'Use apenas letras';
       }
     } else {
       if (!form.name.trim()) {
         nextErrors.name = 'Campo obrigatório';
+      } else if (!hasOnlyLetters(form.name)) {
+        nextErrors.name = 'Use apenas letras';
       }
 
       if (!form.lastName.trim()) {
         nextErrors.lastName = 'Campo obrigatório';
+      } else if (!hasOnlyLetters(form.lastName)) {
+        nextErrors.lastName = 'Use apenas letras';
       }
     }
 
     if (!normalizedEmail) {
       nextErrors.email = 'Campo obrigatório';
-    } else if (!normalizedEmail.includes('@')) {
-      nextErrors.email = 'Informe um e-mail válido';
+    } else if (!isInstitutionalEmail(normalizedEmail)) {
+      nextErrors.email = 'Use e-mail institucional da UTFPR';
     }
 
     if (!form.birthDate) {
@@ -103,6 +109,12 @@ export default function RegisterScreen() {
 
     if (!form.password) {
       nextErrors.password = 'Campo obrigatório';
+    } else {
+      const passwordError = getPasswordError(form.password);
+
+      if (passwordError) {
+        nextErrors.password = passwordError;
+      }
     }
 
     if (!form.confirmPassword) {
@@ -385,6 +397,30 @@ function formatApiDate(value: Date) {
   const day = String(value.getDate()).padStart(2, '0');
 
   return `${year}-${month}-${day}`;
+}
+
+function hasOnlyLetters(value: string) {
+  return /^[A-Za-zÀ-ÖØ-öø-ÿ\s]+$/.test(value.trim());
+}
+
+function isInstitutionalEmail(value: string) {
+  return /^[a-z0-9._%+\-]+@(alunos\.)?utfpr\.edu\.br$/i.test(value.trim());
+}
+
+function getPasswordError(value: string) {
+  if (value.length < 8) {
+    return 'A senha deve ter pelo menos 8 caracteres';
+  }
+
+  if (!/[0-9]/.test(value)) {
+    return 'A senha deve conter pelo menos um número';
+  }
+
+  if (!/[^A-Za-z0-9]/.test(value)) {
+    return 'A senha deve conter pelo menos um caractere especial';
+  }
+
+  return null;
 }
 
 const styles = StyleSheet.create({
