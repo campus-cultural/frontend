@@ -1,4 +1,3 @@
-import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
@@ -6,6 +5,7 @@ import {
   ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -14,6 +14,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import DatePicker, { DateType, useDefaultStyles } from 'react-native-ui-datepicker';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { login, registerUser, UserRole } from '@/src/lib/api/campus';
@@ -46,8 +47,10 @@ const initialForm: RegisterForm = {
 
 export default function RegisterScreen() {
   const router = useRouter();
+  const datePickerStyles = useDefaultStyles();
   const [form, setForm] = useState<RegisterForm>(initialForm);
   const [errors, setErrors] = useState<RegisterErrors>({});
+  const [draftBirthDate, setDraftBirthDate] = useState<Date>(new Date(2000, 0, 1));
   const [showBirthPicker, setShowBirthPicker] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -62,14 +65,20 @@ export default function RegisterScreen() {
     setErrors((current) => ({ ...current, [field]: undefined }));
   }
 
-  function handleBirthDateChange(event: DateTimePickerEvent, value?: Date) {
-    if (event.type === 'dismissed' || !value) {
-      setShowBirthPicker(false);
-      return;
-    }
+  function openBirthDatePicker() {
+    setDraftBirthDate(form.birthDate ?? new Date(2000, 0, 1));
+    setShowBirthPicker(true);
+  }
 
-    updateField('birthDate', value);
+  function applyBirthDate() {
+    updateField('birthDate', draftBirthDate);
     setShowBirthPicker(false);
+  }
+
+  function handleBirthPickerChange(date: DateType) {
+    if (date) {
+      setDraftBirthDate(toNativeDate(date));
+    }
   }
 
   function validateForm() {
@@ -267,7 +276,7 @@ export default function RegisterScreen() {
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel="Selecionar data de nascimento"
-                onPress={() => setShowBirthPicker(true)}
+                onPress={openBirthDatePicker}
                 style={[styles.inputCard, errors.birthDate ? styles.inputError : null]}>
                 <MaterialIcons name="calendar-today" size={20} color="#7C8794" />
                 <Text style={[styles.dateText, form.birthDate ? styles.dateTextFilled : null]}>
@@ -278,16 +287,6 @@ export default function RegisterScreen() {
                 {errors.birthDate ?? ' '}
               </Text>
             </View>
-
-            {showBirthPicker ? (
-              <DateTimePicker
-                display={Platform.select({ ios: 'spinner', default: 'default' })}
-                maximumDate={new Date()}
-                mode="date"
-                onChange={handleBirthDateChange}
-                value={form.birthDate ?? new Date(2000, 0, 1)}
-              />
-            ) : null}
 
             <FormInput
               error={errors.password}
@@ -320,6 +319,51 @@ export default function RegisterScreen() {
           </Pressable>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      <Modal transparent animationType="fade" visible={showBirthPicker}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.datePopover}>
+            <View style={styles.popoverHeader}>
+              <Text style={styles.popoverTitle}>Data de nascimento</Text>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Fechar seletor"
+                onPress={() => setShowBirthPicker(false)}
+                hitSlop={10}>
+                <MaterialIcons name="close" size={22} color="#5F6670" />
+              </Pressable>
+            </View>
+            <DatePicker
+              mode="single"
+              date={draftBirthDate}
+              firstDayOfWeek={0}
+              locale="pt-br"
+              maxDate={new Date()}
+              onChange={({ date }) => handleBirthPickerChange(date)}
+              styles={{
+                ...datePickerStyles,
+                selected: styles.datePickerSelected,
+                selected_label: styles.datePickerSelectedLabel,
+                today: styles.datePickerToday,
+              }}
+            />
+            <View style={styles.popoverActions}>
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => setShowBirthPicker(false)}
+                style={styles.popoverCancelButton}>
+                <Text style={styles.popoverCancelText}>Cancelar</Text>
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                onPress={applyBirthDate}
+                style={styles.popoverConfirmButton}>
+                <Text style={styles.popoverConfirmText}>Aplicar</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -389,6 +433,22 @@ function FormInput({
 
 function formatDisplayDate(value: Date) {
   return new Intl.DateTimeFormat('pt-BR').format(value);
+}
+
+function toNativeDate(value: DateType) {
+  if (value instanceof Date) {
+    return value;
+  }
+
+  if (typeof value === 'string' || typeof value === 'number') {
+    return new Date(value);
+  }
+
+  if (value && typeof value === 'object' && 'toDate' in value) {
+    return (value as { toDate: () => Date }).toDate();
+  }
+
+  return new Date(2000, 0, 1);
 }
 
 function formatApiDate(value: Date) {
@@ -554,6 +614,81 @@ const styles = StyleSheet.create({
     color: '#3F3300',
     fontSize: 15,
     fontWeight: '900',
+    textTransform: 'uppercase',
+  },
+  modalOverlay: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(17, 17, 17, 0.36)',
+    flex: 1,
+    justifyContent: 'center',
+    padding: 20,
+  },
+  datePopover: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    maxWidth: 430,
+    padding: 16,
+    width: '100%',
+  },
+  popoverHeader: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  popoverTitle: {
+    color: '#20242A',
+    fontSize: 17,
+    fontWeight: '900',
+  },
+  datePickerSelected: {
+    backgroundColor: '#FFCC00',
+    borderColor: '#FFCC00',
+  },
+  datePickerSelectedLabel: {
+    color: '#111111',
+    fontWeight: '900',
+  },
+  datePickerToday: {
+    borderColor: '#FFCC00',
+    borderWidth: 1,
+  },
+  popoverActions: {
+    flexDirection: 'row',
+    gap: 10,
+    justifyContent: 'flex-end',
+    marginTop: 14,
+  },
+  popoverCancelButton: {
+    alignItems: 'center',
+    backgroundColor: '#ECEDEF',
+    borderRadius: 6,
+    height: 42,
+    justifyContent: 'center',
+    minWidth: 104,
+    paddingHorizontal: 16,
+  },
+  popoverCancelText: {
+    color: '#5F6670',
+    fontSize: 12,
+    fontWeight: '900',
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+  },
+  popoverConfirmButton: {
+    alignItems: 'center',
+    backgroundColor: '#FFCC00',
+    borderRadius: 6,
+    height: 42,
+    justifyContent: 'center',
+    minWidth: 104,
+    paddingHorizontal: 16,
+  },
+  popoverConfirmText: {
+    color: '#111111',
+    fontSize: 12,
+    fontWeight: '900',
+    letterSpacing: 0.8,
     textTransform: 'uppercase',
   },
 });

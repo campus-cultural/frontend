@@ -18,7 +18,6 @@ import {
   listEvents,
 } from '@/src/lib/api/campus';
 import { getEventImageUri } from '@/src/lib/events/eventImage';
-import { mockEvents } from '@/src/lib/events/mockEvents';
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -47,7 +46,7 @@ export default function HomeScreen() {
           }
 
           if (isMounted) {
-            setEvents(mockEvents);
+            setEvents([]);
           }
         } finally {
           if (isMounted) {
@@ -79,6 +78,10 @@ export default function HomeScreen() {
         {events.map((event, index) => (
           <EventCard event={event} index={index} key={event.id} />
         ))}
+
+        {!isLoading && events.length === 0 ? (
+          <Text style={styles.emptyText}>Nenhum evento disponível no momento.</Text>
+        ) : null}
       </ScrollView>
     </SafeAreaView>
   );
@@ -173,6 +176,13 @@ const styles = StyleSheet.create({
     color: '#6B7280',
     fontSize: 12,
     fontWeight: '800',
+  },
+  emptyText: {
+    color: '#7A7F87',
+    fontSize: 13,
+    fontWeight: '800',
+    paddingTop: 32,
+    textAlign: 'center',
   },
   card: {
     backgroundColor: '#FFFFFF',

@@ -1,4 +1,3 @@
-import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
@@ -6,8 +5,8 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -16,6 +15,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import DatePicker, { DateType, useDefaultStyles } from 'react-native-ui-datepicker';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { createEvent, getEvent, isAuthSessionError, updateEvent } from '@/src/lib/api/campus';
@@ -53,15 +53,23 @@ const requiredFields: (keyof Pick<EventForm, 'name' | 'dateTime' | 'place' | 'de
   'description',
 ];
 
-type PickerMode = 'date' | 'time';
+type Feedback = {
+  message: string;
+  onClose?: () => void;
+  title: string;
+  type: 'error' | 'success' | 'warning';
+};
 
 export default function NewEventScreen() {
   const router = useRouter();
   const { eventId } = useLocalSearchParams<{ eventId?: string }>();
+  const datePickerStyles = useDefaultStyles();
   const editingEventId = eventId ? Number(eventId) : null;
   const [form, setForm] = useState<EventForm>(initialForm);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
-  const [pickerMode, setPickerMode] = useState<PickerMode | null>(null);
+  const [draftDate, setDraftDate] = useState<Date>(new Date());
+  const [isDatePopoverVisible, setIsDatePopoverVisible] = useState(false);
+  const [feedback, setFeedback] = useState<Feedback | null>(null);
   const [errors, setErrors] = useState<Partial<Record<keyof EventForm, string>>>({});
   const [isLoadingEvent, setIsLoadingEvent] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -104,10 +112,11 @@ export default function NewEventScreen() {
           return;
         }
 
-        Alert.alert(
-          'Não foi possível carregar',
-          error instanceof Error ? error.message : 'Tente novamente em instantes.',
-        );
+        showFeedback({
+          title: 'Não foi possível carregar',
+          message: error instanceof Error ? error.message : 'Tente novamente em instantes.',
+          type: 'error',
+        });
       } finally {
         setIsLoadingEvent(false);
       }
@@ -125,7 +134,11 @@ export default function NewEventScreen() {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
 
     if (!permission.granted) {
-      Alert.alert('Permissão necessária', 'Permita o acesso à galeria para escolher o banner.');
+      showFeedback({
+        title: 'Permissão necessária',
+        message: 'Permita o acesso à galeria para escolher o banner.',
+        type: 'warning',
+      });
       return;
     }
 
@@ -153,29 +166,18 @@ export default function NewEventScreen() {
   }
 
   function openDatePicker() {
-    setPickerMode('date');
+    setDraftDate(selectedDate ?? new Date());
+    setIsDatePopoverVisible(true);
   }
 
   function openTimePicker() {
-    setPickerMode('time');
+    openDatePicker();
   }
 
-  function handleDateTimeChange(event: DateTimePickerEvent, value?: Date) {
-    if (event.type === 'dismissed' || !value) {
-      setPickerMode(null);
-      return;
-    }
-
-    const nextDate = mergeDateTime(selectedDate ?? new Date(), value, pickerMode ?? 'date');
-    setSelectedDate(nextDate);
-    updateField('dateTime', formatDateTime(nextDate));
-
-    if (Platform.OS === 'android' && pickerMode === 'date') {
-      setPickerMode('time');
-      return;
-    }
-
-    setPickerMode(null);
+  function applyDateTimeSelection() {
+    setSelectedDate(draftDate);
+    updateField('dateTime', formatDateTime(draftDate));
+    setIsDatePopoverVisible(false);
   }
 
   function validateForm() {
@@ -193,7 +195,11 @@ export default function NewEventScreen() {
 
   async function saveEvent() {
     if (!validateForm()) {
-      Alert.alert('Revise o formulário', 'Preencha todos os campos obrigatórios antes de salvar.');
+      showFeedback({
+        title: 'Revise o formulário',
+        message: 'Preencha todos os campos obrigatórios antes de salvar.',
+        type: 'warning',
+      });
       return;
     }
 
@@ -210,11 +216,20 @@ export default function NewEventScreen() {
 
       if (isEditing && editingEventId !== null) {
         await updateEvent(editingEventId, payload);
-        Alert.alert('Evento atualizado', 'As alterações foram salvas.');
+        showFeedback({
+          title: 'Evento atualizado',
+          message: 'As alterações foram salvas.',
+          type: 'success',
+          onClose: () => router.replace('/perfil' as never),
+        });
       } else {
         await createEvent(payload);
-        Alert.alert('Evento salvo', 'O novo evento foi criado como ativo.');
         discardDraft();
+        showFeedback({
+          title: 'Evento salvo',
+          message: 'O novo evento foi criado como ativo.',
+          type: 'success',
+        });
       }
     } catch (error) {
       if (isAuthSessionError(error)) {
@@ -223,10 +238,12 @@ export default function NewEventScreen() {
         return;
       }
 
-      Alert.alert(
-        'Não foi possível salvar',
-        error instanceof Error ? error.message : 'Verifique se a API está rodando e tente novamente.',
-      );
+      showFeedback({
+        title: 'Não foi possível salvar',
+        message:
+          error instanceof Error ? error.message : 'Verifique se a API está rodando e tente novamente.',
+        type: 'error',
+      });
     } finally {
       setIsSaving(false);
     }
@@ -235,8 +252,25 @@ export default function NewEventScreen() {
   function discardDraft() {
     setForm(initialForm);
     setSelectedDate(null);
-    setPickerMode(null);
+    setDraftDate(new Date());
+    setIsDatePopoverVisible(false);
     setErrors({});
+  }
+
+  function showFeedback(nextFeedback: Feedback) {
+    setFeedback(nextFeedback);
+  }
+
+  function closeFeedback() {
+    const onClose = feedback?.onClose;
+    setFeedback(null);
+    onClose?.();
+  }
+
+  function handlePickerChange(date: DateType) {
+    if (date) {
+      setDraftDate(toNativeDate(date));
+    }
   }
 
   return (
@@ -325,15 +359,6 @@ export default function NewEventScreen() {
               </Pressable>
             </View>
 
-            {pickerMode ? (
-              <DateTimePicker
-                display={Platform.select({ ios: 'spinner', default: 'default' })}
-                mode={pickerMode}
-                onChange={handleDateTimeChange}
-                value={selectedDate ?? new Date()}
-              />
-            ) : null}
-
             <LabeledInput
               error={errors.place}
               label="Local"
@@ -411,6 +436,54 @@ export default function NewEventScreen() {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      <Modal transparent animationType="fade" visible={isDatePopoverVisible}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.datePopover}>
+            <View style={styles.popoverHeader}>
+              <Text style={styles.popoverTitle}>Data e horário</Text>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Fechar seletor"
+                onPress={() => setIsDatePopoverVisible(false)}
+                hitSlop={10}>
+                <MaterialIcons name="close" size={22} color="#5F6670" />
+              </Pressable>
+            </View>
+            <DatePicker
+              mode="single"
+              date={draftDate}
+              firstDayOfWeek={0}
+              locale="pt-br"
+              onChange={({ date }) => handlePickerChange(date)}
+              timePicker
+              use12Hours={false}
+              styles={{
+                ...datePickerStyles,
+                selected: styles.datePickerSelected,
+                selected_label: styles.datePickerSelectedLabel,
+                today: styles.datePickerToday,
+              }}
+            />
+            <View style={styles.popoverActions}>
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => setIsDatePopoverVisible(false)}
+                style={styles.popoverCancelButton}>
+                <Text style={styles.popoverCancelText}>Cancelar</Text>
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                onPress={applyDateTimeSelection}
+                style={styles.popoverConfirmButton}>
+                <Text style={styles.popoverConfirmText}>Aplicar</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <FeedbackPopover feedback={feedback} onClose={closeFeedback} />
     </SafeAreaView>
   );
 }
@@ -475,16 +548,65 @@ function formatDateTime(value: Date) {
   return `${day} ${month} · ${hours}:${minutes}`;
 }
 
-function mergeDateTime(current: Date, picked: Date, mode: PickerMode) {
-  const nextDate = new Date(current);
-
-  if (mode === 'date') {
-    nextDate.setFullYear(picked.getFullYear(), picked.getMonth(), picked.getDate());
-    return nextDate;
+function toNativeDate(value: DateType) {
+  if (value instanceof Date) {
+    return value;
   }
 
-  nextDate.setHours(picked.getHours(), picked.getMinutes(), 0, 0);
-  return nextDate;
+  if (typeof value === 'string' || typeof value === 'number') {
+    return new Date(value);
+  }
+
+  if (value && typeof value === 'object' && 'toDate' in value) {
+    return (value as { toDate: () => Date }).toDate();
+  }
+
+  return new Date();
+}
+
+function FeedbackPopover({
+  feedback,
+  onClose,
+}: {
+  feedback: Feedback | null;
+  onClose: () => void;
+}) {
+  if (!feedback) {
+    return null;
+  }
+
+  return (
+    <Modal transparent animationType="fade" visible>
+      <View style={styles.modalOverlay}>
+        <View style={styles.feedbackPopover}>
+          <View style={[styles.feedbackIcon, getFeedbackIconStyle(feedback.type)]}>
+            <MaterialIcons
+              name={feedback.type === 'success' ? 'check' : feedback.type === 'warning' ? 'warning' : 'close'}
+              size={22}
+              color="#111111"
+            />
+          </View>
+          <Text style={styles.feedbackTitle}>{feedback.title}</Text>
+          <Text style={styles.feedbackMessage}>{feedback.message}</Text>
+          <Pressable accessibilityRole="button" onPress={onClose} style={styles.feedbackButton}>
+            <Text style={styles.feedbackButtonText}>Entendi</Text>
+          </Pressable>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+function getFeedbackIconStyle(type: Feedback['type']) {
+  if (type === 'success') {
+    return styles.feedbackIcon_success;
+  }
+
+  if (type === 'warning') {
+    return styles.feedbackIcon_warning;
+  }
+
+  return styles.feedbackIcon_error;
 }
 
 const styles = StyleSheet.create({
@@ -580,6 +702,136 @@ const styles = StyleSheet.create({
     color: '#5F6670',
     fontSize: 12,
     fontWeight: '800',
+  },
+  modalOverlay: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(17, 17, 17, 0.36)',
+    flex: 1,
+    justifyContent: 'center',
+    padding: 20,
+  },
+  datePopover: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    maxWidth: 430,
+    padding: 16,
+    width: '100%',
+  },
+  popoverHeader: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  popoverTitle: {
+    color: '#20242A',
+    fontSize: 17,
+    fontWeight: '900',
+  },
+  datePickerSelected: {
+    backgroundColor: '#FFCC00',
+    borderColor: '#FFCC00',
+  },
+  datePickerSelectedLabel: {
+    color: '#111111',
+    fontWeight: '900',
+  },
+  datePickerToday: {
+    borderColor: '#FFCC00',
+    borderWidth: 1,
+  },
+  popoverActions: {
+    flexDirection: 'row',
+    gap: 10,
+    justifyContent: 'flex-end',
+    marginTop: 14,
+  },
+  popoverCancelButton: {
+    alignItems: 'center',
+    backgroundColor: '#ECEDEF',
+    borderRadius: 6,
+    height: 42,
+    justifyContent: 'center',
+    minWidth: 104,
+    paddingHorizontal: 16,
+  },
+  popoverCancelText: {
+    color: '#5F6670',
+    fontSize: 12,
+    fontWeight: '900',
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+  },
+  popoverConfirmButton: {
+    alignItems: 'center',
+    backgroundColor: '#FFCC00',
+    borderRadius: 6,
+    height: 42,
+    justifyContent: 'center',
+    minWidth: 104,
+    paddingHorizontal: 16,
+  },
+  popoverConfirmText: {
+    color: '#111111',
+    fontSize: 12,
+    fontWeight: '900',
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+  },
+  feedbackPopover: {
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    maxWidth: 360,
+    padding: 22,
+    width: '100%',
+  },
+  feedbackIcon: {
+    alignItems: 'center',
+    borderRadius: 22,
+    height: 44,
+    justifyContent: 'center',
+    marginBottom: 14,
+    width: 44,
+  },
+  feedbackIcon_success: {
+    backgroundColor: '#FFCC00',
+  },
+  feedbackIcon_warning: {
+    backgroundColor: '#FFE8A3',
+  },
+  feedbackIcon_error: {
+    backgroundColor: '#FECACA',
+  },
+  feedbackTitle: {
+    color: '#20242A',
+    fontSize: 17,
+    fontWeight: '900',
+    textAlign: 'center',
+  },
+  feedbackMessage: {
+    color: '#5F6670',
+    fontSize: 13,
+    fontWeight: '700',
+    lineHeight: 19,
+    marginTop: 8,
+    textAlign: 'center',
+  },
+  feedbackButton: {
+    alignItems: 'center',
+    backgroundColor: '#FFCC00',
+    borderRadius: 6,
+    height: 44,
+    justifyContent: 'center',
+    marginTop: 18,
+    width: '100%',
+  },
+  feedbackButtonText: {
+    color: '#111111',
+    fontSize: 12,
+    fontWeight: '900',
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
   },
   form: {
     gap: 8,
