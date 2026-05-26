@@ -1,8 +1,8 @@
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -18,9 +18,15 @@ import {
 import DatePicker, { DateType, useDefaultStyles } from 'react-native-ui-datepicker';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { AppToast, AppToastType } from '@/components/ui/app-toast';
+import { UnsavedChangesDialog } from '@/components/ui/unsaved-changes-dialog';
 import { createEvent, getEvent, isAuthSessionError, updateEvent } from '@/src/lib/api/campus';
 import { clearAuthToken } from '@/src/lib/auth/token';
 import { getEventImageBase64, getEventImageUri } from '@/src/lib/events/eventImage';
+import {
+  runWithUnsavedChangesGuard,
+  setUnsavedChangesHandler,
+} from '@/src/lib/navigation/unsavedChangesGuard';
 
 const DESCRIPTION_LIMIT = 500;
 
@@ -53,23 +59,25 @@ const requiredFields: (keyof Pick<EventForm, 'name' | 'dateTime' | 'place' | 'de
   'description',
 ];
 
-type Feedback = {
+type ToastState = {
   message: string;
-  onClose?: () => void;
-  title: string;
-  type: 'error' | 'success' | 'warning';
+  type: AppToastType;
 };
 
 export default function NewEventScreen() {
   const router = useRouter();
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { eventId } = useLocalSearchParams<{ eventId?: string }>();
   const datePickerStyles = useDefaultStyles();
   const editingEventId = eventId ? Number(eventId) : null;
   const [form, setForm] = useState<EventForm>(initialForm);
+  const [savedForm, setSavedForm] = useState<EventForm>(initialForm);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [savedSelectedDate, setSavedSelectedDate] = useState<Date | null>(null);
   const [draftDate, setDraftDate] = useState<Date>(new Date());
   const [isDatePopoverVisible, setIsDatePopoverVisible] = useState(false);
-  const [feedback, setFeedback] = useState<Feedback | null>(null);
+  const [toast, setToast] = useState<ToastState | null>(null);
+  const [pendingNavigation, setPendingNavigation] = useState<(() => void) | null>(null);
   const [errors, setErrors] = useState<Partial<Record<keyof EventForm, string>>>({});
   const [isDescriptionFocused, setIsDescriptionFocused] = useState(false);
   const [isLoadingEvent, setIsLoadingEvent] = useState(false);
@@ -80,6 +88,13 @@ export default function NewEventScreen() {
   const hasDraft = useMemo(
     () => Object.values(form).some((value) => value.trim().length > 0),
     [form],
+  );
+  const hasUnsavedChanges = useMemo(
+    () =>
+      !isLoadingEvent &&
+      (!areEventFormsEqual(form, savedForm) ||
+        (selectedDate?.getTime() ?? null) !== (savedSelectedDate?.getTime() ?? null)),
+    [form, isLoadingEvent, savedForm, savedSelectedDate, selectedDate],
   );
 
   useEffect(() => {
@@ -94,9 +109,7 @@ export default function NewEventScreen() {
       try {
         const event = await getEvent(editingEventId);
         const nextDate = new Date(event.event_datetime);
-
-        setSelectedDate(nextDate);
-        setForm({
+        const nextForm = {
           imageName: event.image ? 'banner-atual.jpg' : '',
           imageUri: getEventImageUri(event.image) ?? '',
           imageMimeType: event.image ? 'image/jpeg' : '',
@@ -105,7 +118,12 @@ export default function NewEventScreen() {
           dateTime: formatDateTime(nextDate),
           place: event.event_location,
           description: event.description,
-        });
+        };
+
+        setSelectedDate(nextDate);
+        setSavedSelectedDate(nextDate);
+        setForm(nextForm);
+        setSavedForm(nextForm);
       } catch (error) {
         if (isAuthSessionError(error)) {
           await clearAuthToken();
@@ -113,8 +131,7 @@ export default function NewEventScreen() {
           return;
         }
 
-        showFeedback({
-          title: 'Não foi possível carregar',
+        showToast({
           message: error instanceof Error ? error.message : 'Tente novamente em instantes.',
           type: 'error',
         });
@@ -126,6 +143,27 @@ export default function NewEventScreen() {
     void loadEventForEditing();
   }, [editingEventId, isEditing, router]);
 
+  useEffect(() => {
+    return () => {
+      if (toastTimerRef.current) {
+        clearTimeout(toastTimerRef.current);
+      }
+    };
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!hasUnsavedChanges) {
+        return undefined;
+      }
+
+      return setUnsavedChangesHandler((continueNavigation) => {
+        setPendingNavigation(() => continueNavigation);
+        return true;
+      });
+    }, [hasUnsavedChanges]),
+  );
+
   function updateField(field: keyof EventForm, value: string) {
     setForm((current) => ({ ...current, [field]: value }));
     setErrors((current) => ({ ...current, [field]: undefined }));
@@ -135,8 +173,7 @@ export default function NewEventScreen() {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
 
     if (!permission.granted) {
-      showFeedback({
-        title: 'Permissão necessária',
+      showToast({
         message: 'Permita o acesso à galeria para escolher o banner.',
         type: 'warning',
       });
@@ -196,8 +233,7 @@ export default function NewEventScreen() {
 
   async function saveEvent() {
     if (!validateForm()) {
-      showFeedback({
-        title: 'Revise o formulário',
+      showToast({
         message: 'Preencha todos os campos obrigatórios antes de salvar.',
         type: 'warning',
       });
@@ -217,17 +253,17 @@ export default function NewEventScreen() {
 
       if (isEditing && editingEventId !== null) {
         await updateEvent(editingEventId, payload);
-        showFeedback({
-          title: 'Evento atualizado',
+        setSavedForm(form);
+        setSavedSelectedDate(selectedDate);
+        showToast({
           message: 'As alterações foram salvas.',
           type: 'success',
-          onClose: () => router.replace('/perfil' as never),
         });
+        setTimeout(() => router.replace('/perfil' as never), 1100);
       } else {
         await createEvent(payload);
         discardDraft();
-        showFeedback({
-          title: 'Evento salvo',
+        showToast({
           message: 'O novo evento foi criado como ativo.',
           type: 'success',
         });
@@ -239,8 +275,7 @@ export default function NewEventScreen() {
         return;
       }
 
-      showFeedback({
-        title: 'Não foi possível salvar',
+      showToast({
         message:
           error instanceof Error ? error.message : 'Verifique se a API está rodando e tente novamente.',
         type: 'error',
@@ -252,20 +287,50 @@ export default function NewEventScreen() {
 
   function discardDraft() {
     setForm(initialForm);
+    setSavedForm(initialForm);
     setSelectedDate(null);
+    setSavedSelectedDate(null);
     setDraftDate(new Date());
     setIsDatePopoverVisible(false);
     setErrors({});
   }
 
-  function showFeedback(nextFeedback: Feedback) {
-    setFeedback(nextFeedback);
+  function restoreSavedDraft() {
+    setForm(savedForm);
+    setSelectedDate(savedSelectedDate);
+    setDraftDate(savedSelectedDate ?? new Date());
+    setIsDatePopoverVisible(false);
+    setErrors({});
   }
 
-  function closeFeedback() {
-    const onClose = feedback?.onClose;
-    setFeedback(null);
-    onClose?.();
+  function showToast(nextToast: ToastState) {
+    if (toastTimerRef.current) {
+      clearTimeout(toastTimerRef.current);
+    }
+
+    setToast(nextToast);
+    toastTimerRef.current = setTimeout(() => {
+      setToast(null);
+    }, 2600);
+  }
+
+  const requestLeave = useCallback(
+    (continueNavigation: () => void) => {
+      runWithUnsavedChangesGuard(continueNavigation);
+    },
+    [],
+  );
+
+  function cancelPendingNavigation() {
+    setPendingNavigation(null);
+  }
+
+  function discardChangesAndLeave() {
+    const continueNavigation = pendingNavigation;
+
+    restoreSavedDraft();
+    setPendingNavigation(null);
+    continueNavigation?.();
   }
 
   function handlePickerChange(date: DateType) {
@@ -286,7 +351,9 @@ export default function NewEventScreen() {
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Voltar"
-            onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))}
+            onPress={() =>
+              requestLeave(() => (router.canGoBack() ? router.back() : router.replace('/')))
+            }
             style={styles.backButton}>
             <MaterialIcons name="arrow-back" size={20} color="#FFCC00" />
             <Text style={styles.backText}>Voltar</Text>
@@ -491,7 +558,12 @@ export default function NewEventScreen() {
         </View>
       </Modal>
 
-      <FeedbackPopover feedback={feedback} onClose={closeFeedback} />
+      <UnsavedChangesDialog
+        visible={Boolean(pendingNavigation)}
+        onCancel={cancelPendingNavigation}
+        onDiscard={discardChangesAndLeave}
+      />
+      <AppToast visible={Boolean(toast)} message={toast?.message ?? ''} type={toast?.type} />
     </SafeAreaView>
   );
 }
@@ -587,49 +659,17 @@ function toNativeDate(value: DateType) {
   return new Date();
 }
 
-function FeedbackPopover({
-  feedback,
-  onClose,
-}: {
-  feedback: Feedback | null;
-  onClose: () => void;
-}) {
-  if (!feedback) {
-    return null;
-  }
-
+function areEventFormsEqual(left: EventForm, right: EventForm) {
   return (
-    <Modal transparent animationType="fade" visible>
-      <View style={styles.modalOverlay}>
-        <View style={styles.feedbackPopover}>
-          <View style={[styles.feedbackIcon, getFeedbackIconStyle(feedback.type)]}>
-            <MaterialIcons
-              name={feedback.type === 'success' ? 'check' : feedback.type === 'warning' ? 'warning' : 'close'}
-              size={22}
-              color="#111111"
-            />
-          </View>
-          <Text style={styles.feedbackTitle}>{feedback.title}</Text>
-          <Text style={styles.feedbackMessage}>{feedback.message}</Text>
-          <Pressable accessibilityRole="button" onPress={onClose} style={styles.feedbackButton}>
-            <Text style={styles.feedbackButtonText}>Entendi</Text>
-          </Pressable>
-        </View>
-      </View>
-    </Modal>
+    left.imageName === right.imageName &&
+    left.imageUri === right.imageUri &&
+    left.imageMimeType === right.imageMimeType &&
+    left.imageBase64 === right.imageBase64 &&
+    left.name === right.name &&
+    left.dateTime === right.dateTime &&
+    left.place === right.place &&
+    left.description === right.description
   );
-}
-
-function getFeedbackIconStyle(type: Feedback['type']) {
-  if (type === 'success') {
-    return styles.feedbackIcon_success;
-  }
-
-  if (type === 'warning') {
-    return styles.feedbackIcon_warning;
-  }
-
-  return styles.feedbackIcon_error;
 }
 
 const styles = StyleSheet.create({
@@ -795,61 +835,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   popoverConfirmText: {
-    color: '#111111',
-    fontSize: 12,
-    fontWeight: '900',
-    letterSpacing: 0.8,
-    textTransform: 'uppercase',
-  },
-  feedbackPopover: {
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    maxWidth: 360,
-    padding: 22,
-    width: '100%',
-  },
-  feedbackIcon: {
-    alignItems: 'center',
-    borderRadius: 22,
-    height: 44,
-    justifyContent: 'center',
-    marginBottom: 14,
-    width: 44,
-  },
-  feedbackIcon_success: {
-    backgroundColor: '#FFCC00',
-  },
-  feedbackIcon_warning: {
-    backgroundColor: '#FFE8A3',
-  },
-  feedbackIcon_error: {
-    backgroundColor: '#FECACA',
-  },
-  feedbackTitle: {
-    color: '#20242A',
-    fontSize: 17,
-    fontWeight: '900',
-    textAlign: 'center',
-  },
-  feedbackMessage: {
-    color: '#5F6670',
-    fontSize: 13,
-    fontWeight: '700',
-    lineHeight: 19,
-    marginTop: 8,
-    textAlign: 'center',
-  },
-  feedbackButton: {
-    alignItems: 'center',
-    backgroundColor: '#FFCC00',
-    borderRadius: 6,
-    height: 44,
-    justifyContent: 'center',
-    marginTop: 18,
-    width: '100%',
-  },
-  feedbackButtonText: {
     color: '#111111',
     fontSize: 12,
     fontWeight: '900',

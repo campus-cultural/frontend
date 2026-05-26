@@ -15,6 +15,8 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { AppToast, AppToastType } from '@/components/ui/app-toast';
+import { UnsavedChangesDialog } from '@/components/ui/unsaved-changes-dialog';
 import {
   CurrentUser,
   getCurrentUser,
@@ -24,23 +26,40 @@ import {
   CampusEvent,
 } from '@/src/lib/api/campus';
 import { clearAuthToken } from '@/src/lib/auth/token';
+import {
+  runWithUnsavedChangesGuard,
+  setUnsavedChangesHandler,
+} from '@/src/lib/navigation/unsavedChangesGuard';
 import { getProfileAvatarUri, saveProfileAvatarUri } from '@/src/lib/profile/avatar';
+
+type ToastState = {
+  message: string;
+  type: AppToastType;
+};
 
 export default function ProfileScreen() {
   const router = useRouter();
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [user, setUser] = useState<CurrentUser | null>(null);
+  const [savedUser, setSavedUser] = useState<CurrentUser | null>(null);
   const [profileImageUri, setProfileImageUri] = useState<string | null>(null);
   const [savedProfileImageUri, setSavedProfileImageUri] = useState<string | null>(null);
   const [professorEvents, setProfessorEvents] = useState<CampusEvent[]>([]);
   const [eventSearch, setEventSearch] = useState('');
   const [isSearchFocused, setIsSearchFocused] = useState(false);
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [toast, setToast] = useState<ToastState | null>(null);
+  const [pendingNavigation, setPendingNavigation] = useState<(() => void) | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const canManageEvents = user?.role === 'professor' || user?.role === 'admin';
   const hasUnsavedProfileImage = profileImageUri !== savedProfileImageUri;
+  const hasUnsavedProfileData =
+    Boolean(user && savedUser) &&
+    (user?.name !== savedUser?.name ||
+      user?.last_name !== savedUser?.last_name ||
+      user?.email !== savedUser?.email);
+  const hasUnsavedProfileChanges = hasUnsavedProfileImage || hasUnsavedProfileData;
   const filteredProfessorEvents = professorEvents.filter((event) =>
     event.name.toLowerCase().includes(eventSearch.trim().toLowerCase()),
   );
@@ -63,6 +82,7 @@ export default function ProfileScreen() {
       const nextEvents = nextCanManageEvents ? await listEvents() : [];
 
       setUser(currentUser);
+      setSavedUser(currentUser);
       setProfileImageUri(savedAvatarUri);
       setSavedProfileImageUri(savedAvatarUri);
       setProfessorEvents(nextEvents);
@@ -89,6 +109,19 @@ export default function ProfileScreen() {
     }, [loadProfile]),
   );
 
+  useFocusEffect(
+    useCallback(() => {
+      if (!hasUnsavedProfileChanges) {
+        return undefined;
+      }
+
+      return setUnsavedChangesHandler((continueNavigation) => {
+        setPendingNavigation(() => continueNavigation);
+        return true;
+      });
+    }, [hasUnsavedProfileChanges]),
+  );
+
   useEffect(() => {
     return () => {
       if (toastTimerRef.current) {
@@ -97,20 +130,27 @@ export default function ProfileScreen() {
     };
   }, []);
 
-  function showToast(message: string) {
+  function showToast(nextToast: ToastState) {
     if (toastTimerRef.current) {
       clearTimeout(toastTimerRef.current);
     }
 
-    setToastMessage(message);
+    setToast(nextToast);
     toastTimerRef.current = setTimeout(() => {
-      setToastMessage(null);
+      setToast(null);
     }, 2600);
   }
 
   function updateUserField(field: 'email' | 'last_name' | 'name', value: string) {
     setUser((current) => (current ? { ...current, [field]: value } : current));
   }
+
+  const requestLeave = useCallback(
+    (continueNavigation: () => void) => {
+      runWithUnsavedChangesGuard(continueNavigation);
+    },
+    [],
+  );
 
   async function handleSignOut() {
     await clearAuthToken();
@@ -123,14 +163,21 @@ export default function ProfileScreen() {
       setSavedProfileImageUri(profileImageUri);
     }
 
-    showToast('Perfil salvo com sucesso.');
+    if (user) {
+      setSavedUser(user);
+    }
+
+    showToast({ message: 'Perfil salvo com sucesso.', type: 'success' });
   }
 
   async function handleChangeProfileImage() {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
 
     if (!permission.granted) {
-      showToast('Permita o acesso à galeria para escolher a foto.');
+      showToast({
+        message: 'Permita o acesso à galeria para escolher a foto.',
+        type: 'warning',
+      });
       return;
     }
 
@@ -144,6 +191,22 @@ export default function ProfileScreen() {
     if (!result.canceled) {
       setProfileImageUri(result.assets[0].uri);
     }
+  }
+
+  function cancelPendingNavigation() {
+    setPendingNavigation(null);
+  }
+
+  function discardChangesAndLeave() {
+    const continueNavigation = pendingNavigation;
+
+    if (savedUser) {
+      setUser(savedUser);
+    }
+
+    setProfileImageUri(savedProfileImageUri);
+    setPendingNavigation(null);
+    continueNavigation?.();
   }
 
   return (
@@ -233,7 +296,18 @@ export default function ProfileScreen() {
 
                 {filteredProfessorEvents.length ? (
                   filteredProfessorEvents.map((event) => (
-                    <EditableEventCard event={event} key={event.id} />
+                    <EditableEventCard
+                      event={event}
+                      key={event.id}
+                      onSelect={() =>
+                        requestLeave(() =>
+                          router.push({
+                            pathname: '/novo-evento',
+                            params: { eventId: String(event.id) },
+                          } as never),
+                        )
+                      }
+                    />
                   ))
                 ) : (
                   <Text style={styles.emptyEventsText}>Nenhum evento encontrado.</Text>
@@ -254,7 +328,7 @@ export default function ProfileScreen() {
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel="Cadastrar novo evento"
-                onPress={() => router.push('/novo-evento')}
+                onPress={() => requestLeave(() => router.push('/novo-evento'))}
                 style={[styles.primaryButton, styles.createEventButton]}>
                 <MaterialIcons name="add" size={17} color="#111111" />
                 <Text style={styles.primaryButtonText}>Cadastrar evento</Text>
@@ -275,7 +349,7 @@ export default function ProfileScreen() {
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="Sair da conta"
-              onPress={handleSignOut}
+              onPress={() => requestLeave(() => void handleSignOut())}
               style={styles.signOutButton}>
               <MaterialIcons name="logout" size={15} color="#676C74" />
               <Text style={styles.signOutText}>Sair da conta</Text>
@@ -284,30 +358,24 @@ export default function ProfileScreen() {
         ) : null}
       </ScrollView>
 
-      {toastMessage ? (
-        <View pointerEvents="none" style={styles.toast}>
-          <MaterialIcons name="check-circle" size={18} color="#111111" />
-          <Text style={styles.toastText}>{toastMessage}</Text>
-        </View>
-      ) : null}
+      <UnsavedChangesDialog
+        visible={Boolean(pendingNavigation)}
+        onCancel={cancelPendingNavigation}
+        onDiscard={discardChangesAndLeave}
+      />
+      <AppToast visible={Boolean(toast)} message={toast?.message ?? ''} type={toast?.type} />
     </SafeAreaView>
   );
 }
 
-function EditableEventCard({ event }: { event: CampusEvent }) {
-  const router = useRouter();
+function EditableEventCard({ event, onSelect }: { event: CampusEvent; onSelect: () => void }) {
   const eventDate = new Date(event.event_datetime);
 
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={`Editar evento ${event.name}`}
-      onPress={() =>
-        router.push({
-          pathname: '/novo-evento',
-          params: { eventId: String(event.id) },
-        } as never)
-      }
+      onPress={onSelect}
       style={styles.editableEventCard}>
       <View style={styles.eventAccent} />
       <View style={styles.editableEventContent}>
@@ -641,27 +709,5 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     letterSpacing: 0.8,
     textTransform: 'uppercase',
-  },
-  toast: {
-    alignItems: 'center',
-    alignSelf: 'center',
-    backgroundColor: '#FFCC00',
-    borderRadius: 999,
-    bottom: 112,
-    flexDirection: 'row',
-    gap: 8,
-    minHeight: 44,
-    paddingHorizontal: 18,
-    position: 'absolute',
-    shadowColor: '#111111',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.14,
-    shadowRadius: 16,
-    elevation: 6,
-  },
-  toastText: {
-    color: '#111111',
-    fontSize: 12,
-    fontWeight: '900',
   },
 });
