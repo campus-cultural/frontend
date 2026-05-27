@@ -38,22 +38,26 @@ export function formatCampusTimeRange(value: string | Date, durationMinutes = 90
 }
 
 export function getCampusDateKey(value: string | Date) {
-  const parts = new Intl.DateTimeFormat('en-CA', {
-    day: '2-digit',
-    month: '2-digit',
-    timeZone: CAMPUS_TIME_ZONE,
-    year: 'numeric',
-  }).formatToParts(toDate(value));
+  const parts = getCampusDateParts(value);
 
   return `${getPart(parts, 'year')}-${getPart(parts, 'month')}-${getPart(parts, 'day')}`;
 }
 
 export function toCampusDateTimeIso(value: Date) {
-  const year = value.getFullYear();
-  const month = String(value.getMonth() + 1).padStart(2, '0');
-  const day = String(value.getDate()).padStart(2, '0');
-  const hours = String(value.getHours()).padStart(2, '0');
-  const minutes = String(value.getMinutes()).padStart(2, '0');
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    day: '2-digit',
+    hour: '2-digit',
+    hour12: false,
+    minute: '2-digit',
+    month: '2-digit',
+    timeZone: CAMPUS_TIME_ZONE,
+    year: 'numeric',
+  }).formatToParts(value);
+  const year = getPart(parts, 'year');
+  const month = getPart(parts, 'month');
+  const day = getPart(parts, 'day');
+  const hours = getPart(parts, 'hour');
+  const minutes = getPart(parts, 'minute');
 
   return `${year}-${month}-${day}T${hours}:${minutes}:00${CAMPUS_UTC_OFFSET}`;
 }
@@ -69,6 +73,15 @@ function formatCampusTime(value: Date) {
 
 function getPart(parts: Intl.DateTimeFormatPart[], type: Intl.DateTimeFormatPartTypes) {
   return parts.find((part) => part.type === type)?.value ?? '';
+}
+
+function getCampusDateParts(value: string | Date) {
+  return new Intl.DateTimeFormat('en-CA', {
+    day: '2-digit',
+    month: '2-digit',
+    timeZone: CAMPUS_TIME_ZONE,
+    year: 'numeric',
+  }).formatToParts(toDate(value));
 }
 
 function toDate(value: string | Date) {

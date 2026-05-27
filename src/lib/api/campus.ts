@@ -37,6 +37,11 @@ type TokenPayload = {
   exp?: number;
 };
 
+type AuthSession = {
+  payload: TokenPayload;
+  token: string;
+};
+
 export type EventCreateIn = {
   image?: string | null;
   name: string;
@@ -58,7 +63,7 @@ export type UserCreateIn = {
   password: string;
 };
 
-export type UserUpdateIn = Partial<UserCreateIn>;
+export type UserUpdateIn = UserCreateIn;
 
 export type UserLoginIn = {
   email: string;
@@ -87,7 +92,7 @@ export function isAuthSessionError(error: unknown): error is AuthSessionError {
 
 export async function hasAuthToken() {
   try {
-    await getValidAuthToken();
+    await getValidAuthSession();
     return true;
   } catch {
     return false;
@@ -108,10 +113,10 @@ export async function login(payload: UserLoginIn) {
 }
 
 export async function refreshToken() {
-  const authToken = await getStoredAuthToken();
+  const authSession = await getStoredAuthSession();
 
   try {
-    assertTokenIsValid(authToken);
+    assertTokenPayloadIsValid(authSession.payload);
   } catch (error) {
     if (isAuthSessionError(error)) {
       await clearAuthToken();
@@ -122,7 +127,7 @@ export async function refreshToken() {
 
   const response = await requestJson<TokenOut>('/users/refresh-token', {
     headers: {
-      Authorization: `Bearer ${authToken}`,
+      Authorization: `Bearer ${authSession.token}`,
     },
     method: 'POST',
   });
@@ -146,8 +151,13 @@ export async function getUser(userId: number) {
 }
 
 export async function getCurrentUser() {
-  const tokenPayload = getTokenPayload(await getValidAuthToken());
-  return getUser(Number(tokenPayload.sub));
+  const authSession = await getValidAuthSession();
+
+  return requestJson<CampusUser>(`/users/${Number(authSession.payload.sub)}`, {
+    headers: {
+      Authorization: `Bearer ${authSession.token}`,
+    },
+  });
 }
 
 export async function updateUser(userId: number, payload: UserUpdateIn) {
@@ -213,7 +223,7 @@ export async function deleteEvent(eventId: number) {
   });
 }
 
-async function getStoredAuthToken() {
+async function getStoredAuthSession(): Promise<AuthSession> {
   const authToken = await getAuthToken();
 
   if (!authToken) {
@@ -221,15 +231,11 @@ async function getStoredAuthToken() {
     throw new AuthSessionError('Faça login para autenticar com o backend.');
   }
 
-  return authToken;
-}
-
-async function getValidAuthToken() {
-  const authToken = await getStoredAuthToken();
-  let tokenPayload: TokenPayload;
-
   try {
-    tokenPayload = getTokenPayload(authToken);
+    return {
+      payload: getTokenPayload(authToken),
+      token: authToken,
+    };
   } catch (error) {
     if (isAuthSessionError(error)) {
       await clearAuthToken();
@@ -237,22 +243,24 @@ async function getValidAuthToken() {
 
     throw error;
   }
+}
 
-  if (isTokenExpired(tokenPayload)) {
+async function getValidAuthSession(): Promise<AuthSession> {
+  const authSession = await getStoredAuthSession();
+
+  if (isTokenExpired(authSession.payload)) {
     await clearAuthToken();
     throw new AuthSessionError();
   }
 
-  if (shouldRefreshToken(tokenPayload)) {
-    return refreshAuthToken(authToken);
+  if (shouldRefreshToken(authSession.payload)) {
+    return refreshAuthSession(authSession.token);
   }
 
-  return authToken;
+  return authSession;
 }
 
-async function refreshAuthToken(authToken: string) {
-  assertTokenIsValid(authToken);
-
+async function refreshAuthSession(authToken: string): Promise<AuthSession> {
   const response = await requestJson<TokenOut>('/users/refresh-token', {
     headers: {
       Authorization: `Bearer ${authToken}`,
@@ -260,7 +268,10 @@ async function refreshAuthToken(authToken: string) {
     method: 'POST',
   });
   await saveAuthToken(response.access_token);
-  return response.access_token;
+  return {
+    payload: getTokenPayload(response.access_token),
+    token: response.access_token,
+  };
 }
 
 function getTokenPayload(authToken: string) {
@@ -276,9 +287,7 @@ function getTokenPayload(authToken: string) {
   }
 }
 
-function assertTokenIsValid(authToken: string) {
-  const tokenPayload = getTokenPayload(authToken);
-
+function assertTokenPayloadIsValid(tokenPayload: TokenPayload) {
   if (isTokenExpired(tokenPayload)) {
     throw new AuthSessionError();
   }
@@ -293,12 +302,12 @@ function isTokenExpired(tokenPayload: TokenPayload) {
 }
 
 async function request<T>(path: string, init?: RequestInit) {
-  const authToken = await getValidAuthToken();
+  const authSession = await getValidAuthSession();
 
   return requestJson<T>(path, {
     ...init,
     headers: {
-      Authorization: `Bearer ${authToken}`,
+      Authorization: `Bearer ${authSession.token}`,
       ...init?.headers,
     },
   });
@@ -309,12 +318,12 @@ async function requestPublic<T>(path: string, init?: RequestInit) {
 }
 
 async function requestBlob(path: string, options?: { allowNotFound?: boolean }) {
-  const authToken = await getValidAuthToken();
+  const authSession = await getValidAuthSession();
 
   const response = await fetch(`${API_BASE_URL}${path}`, {
     headers: {
       Accept: 'application/octet-stream',
-      Authorization: `Bearer ${authToken}`,
+      Authorization: `Bearer ${authSession.token}`,
     },
   });
 

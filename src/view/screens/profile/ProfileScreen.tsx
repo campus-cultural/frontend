@@ -25,6 +25,7 @@ import {
   hasAuthToken,
   isAuthSessionError,
   listEvents,
+  login,
   CampusEvent,
   updateUser,
   updateProfilePicture,
@@ -50,6 +51,7 @@ export default function ProfileScreen() {
   const [savedProfileImageUri, setSavedProfileImageUri] = useState<string | null>(null);
   const [professorEvents, setProfessorEvents] = useState<CampusEvent[]>([]);
   const [eventSearch, setEventSearch] = useState('');
+  const [currentPassword, setCurrentPassword] = useState('');
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const [toast, setToast] = useState<ToastState | null>(null);
   const [pendingNavigation, setPendingNavigation] = useState<(() => void) | null>(null);
@@ -91,6 +93,7 @@ export default function ProfileScreen() {
       setProfileImageUri(savedAvatarUri);
       setSavedProfileImageUri(savedAvatarUri);
       setProfessorEvents(nextEvents);
+      setCurrentPassword('');
     } catch (profileError) {
       if (isAuthSessionError(profileError)) {
         await clearAuthToken();
@@ -163,20 +166,45 @@ export default function ProfileScreen() {
   }
 
   async function handleUpdateProfile() {
-    if (!user) {
+    if (!user || !savedUser) {
       return;
     }
 
+    const profileValidationMessage = hasUnsavedProfileData ? validateProfileData(user) : null;
+
+    if (profileValidationMessage) {
+      showToast({
+        message: profileValidationMessage,
+        type: 'warning',
+      });
+      return;
+    }
+
+    if (hasUnsavedProfileData && !currentPassword.trim()) {
+      showToast({
+        message: 'Informe sua senha atual para salvar os dados do perfil.',
+        type: 'warning',
+      });
+      return;
+    }
+
+    const shouldClearPassword = hasUnsavedProfileData;
     setIsSavingProfile(true);
 
     try {
       let updatedUser = user;
 
       if (hasUnsavedProfileData) {
+        await login({ email: savedUser.email, password: currentPassword });
         updatedUser = await updateUser(user.id, {
+          birth_date: user.birth_date,
           email: user.email.trim(),
+          is_active: user.is_active,
           last_name: user.last_name.trim(),
           name: user.name.trim(),
+          password: currentPassword,
+          ra: user.role === 'student' ? user.ra : null,
+          role: user.role,
         });
         setUser(updatedUser);
       }
@@ -187,6 +215,7 @@ export default function ProfileScreen() {
       }
 
       setSavedUser(updatedUser);
+      setCurrentPassword('');
       showToast({ message: 'Perfil salvo com sucesso.', type: 'success' });
     } catch (profileError) {
       if (isAuthSessionError(profileError)) {
@@ -203,6 +232,10 @@ export default function ProfileScreen() {
         type: 'error',
       });
     } finally {
+      if (shouldClearPassword) {
+        setCurrentPassword('');
+      }
+
       setIsSavingProfile(false);
     }
   }
@@ -241,6 +274,7 @@ export default function ProfileScreen() {
       setUser(savedUser);
     }
 
+    setCurrentPassword('');
     setProfileImageUri(savedProfileImageUri);
     setPendingNavigation(null);
     continueNavigation?.();
@@ -324,6 +358,18 @@ export default function ProfileScreen() {
             <ProfileField delay={260} label="Conta" value={roleLabel(user.role).toUpperCase()} />
             {user.role === 'student' && user.ra ? (
               <ProfileField delay={320} label="RA" value={user.ra} />
+            ) : null}
+
+            {hasUnsavedProfileData ? (
+              <ProfileField
+                editable
+                delay={340}
+                label="Senha atual"
+                onChangeText={setCurrentPassword}
+                placeholder="Confirme sua senha para salvar"
+                secureTextEntry
+                value={currentPassword}
+              />
             ) : null}
 
             {canManageEvents ? (
@@ -485,12 +531,16 @@ function ProfileField({
   editable,
   label,
   onChangeText,
+  placeholder,
+  secureTextEntry,
   value,
 }: {
   delay?: number;
   editable?: boolean;
   label: string;
   onChangeText?: (value: string) => void;
+  placeholder?: string;
+  secureTextEntry?: boolean;
   value: string;
 }) {
   const [isFocused, setIsFocused] = useState(false);
@@ -514,7 +564,9 @@ function ProfileField({
           onBlur={() => setIsFocused(false)}
           onChangeText={onChangeText}
           onFocus={() => setIsFocused(true)}
+          placeholder={placeholder}
           placeholderTextColor="#9EA3AB"
+          secureTextEntry={secureTextEntry}
           style={[styles.fieldValue, !editable ? styles.fieldValueDisabled : null]}
           value={value}
         />
@@ -536,6 +588,22 @@ function roleLabel(role: CurrentUser['role']) {
 
 function formatEventTime(value: Date) {
   return formatCampusTimeRange(value);
+}
+
+function validateProfileData(user: CurrentUser) {
+  if (!user.name.trim() || !user.last_name.trim()) {
+    return 'Informe nome e sobrenome antes de salvar.';
+  }
+
+  if (!isInstitutionalEmail(user.email.trim())) {
+    return 'Use um e-mail institucional da UTFPR.';
+  }
+
+  return null;
+}
+
+function isInstitutionalEmail(email: string) {
+  return /^[^\s@]+@(alunos\.)?utfpr\.edu\.br$/i.test(email);
 }
 
 const styles = StyleSheet.create({

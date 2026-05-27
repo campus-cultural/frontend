@@ -1,10 +1,9 @@
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useRouter } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import * as Animatable from 'react-native-animatable';
 import {
   ActivityIndicator,
-  Alert,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -18,6 +17,7 @@ import {
 import DatePicker, { DateType, useDefaultStyles } from 'react-native-ui-datepicker';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { AppToast, AppToastType } from '@/components/ui/app-toast';
 import { login, registerUser, UserRole } from '@/src/lib/api/campus';
 
 type RegisterRole = Exclude<UserRole, 'admin'>;
@@ -34,6 +34,10 @@ type RegisterForm = {
 };
 
 type RegisterErrors = Partial<Record<keyof RegisterForm, string>>;
+type ToastState = {
+  message: string;
+  type: AppToastType;
+};
 
 const initialForm: RegisterForm = {
   role: 'student',
@@ -48,12 +52,15 @@ const initialForm: RegisterForm = {
 
 export default function RegisterScreen() {
   const router = useRouter();
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const navigationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const datePickerStyles = useDefaultStyles();
   const [form, setForm] = useState<RegisterForm>(initialForm);
   const [errors, setErrors] = useState<RegisterErrors>({});
   const [draftBirthDate, setDraftBirthDate] = useState<Date>(new Date(2000, 0, 1));
   const [showBirthPicker, setShowBirthPicker] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [toast, setToast] = useState<ToastState | null>(null);
 
   const isStudent = form.role === 'student';
   const birthDateLabel = useMemo(
@@ -64,6 +71,29 @@ export default function RegisterScreen() {
   function updateField<Key extends keyof RegisterForm>(field: Key, value: RegisterForm[Key]) {
     setForm((current) => ({ ...current, [field]: value }));
     setErrors((current) => ({ ...current, [field]: undefined }));
+  }
+
+  useEffect(() => {
+    return () => {
+      if (toastTimerRef.current) {
+        clearTimeout(toastTimerRef.current);
+      }
+
+      if (navigationTimerRef.current) {
+        clearTimeout(navigationTimerRef.current);
+      }
+    };
+  }, []);
+
+  function showToast(nextToast: ToastState) {
+    if (toastTimerRef.current) {
+      clearTimeout(toastTimerRef.current);
+    }
+
+    setToast(nextToast);
+    toastTimerRef.current = setTimeout(() => {
+      setToast(null);
+    }, 2600);
   }
 
   function openBirthDatePicker() {
@@ -155,7 +185,10 @@ export default function RegisterScreen() {
 
   async function handleRegister() {
     if (!validateForm() || !form.birthDate) {
-      Alert.alert('Revise os dados', 'Preencha todos os campos obrigatórios para cadastrar.');
+      showToast({
+        message: 'Preencha todos os campos obrigatórios para cadastrar.',
+        type: 'warning',
+      });
       return;
     }
 
@@ -181,13 +214,15 @@ export default function RegisterScreen() {
         password: form.password,
       });
 
-      Alert.alert('Cadastro criado', 'Sua conta foi criada com sucesso.');
-      router.replace('/perfil');
+      showToast({ message: 'Sua conta foi criada com sucesso.', type: 'success' });
+      navigationTimerRef.current = setTimeout(() => {
+        router.replace('/perfil');
+      }, 700);
     } catch (error) {
-      Alert.alert(
-        'Não foi possível cadastrar',
-        error instanceof Error ? error.message : 'Verifique seus dados e tente novamente.',
-      );
+      showToast({
+        message: error instanceof Error ? error.message : 'Verifique seus dados e tente novamente.',
+        type: 'error',
+      });
     } finally {
       setIsSaving(false);
     }
@@ -391,6 +426,7 @@ export default function RegisterScreen() {
           </Animatable.View>
         </View>
       </Modal>
+      <AppToast visible={Boolean(toast)} message={toast?.message ?? ''} type={toast?.type} />
     </SafeAreaView>
   );
 }

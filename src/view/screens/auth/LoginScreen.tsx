@@ -1,10 +1,9 @@
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import * as Animatable from 'react-native-animatable';
 import {
   ActivityIndicator,
-  Alert,
   Image,
   KeyboardAvoidingView,
   Platform,
@@ -16,18 +15,25 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { AppToast, AppToastType } from '@/components/ui/app-toast';
 import { hasAuthToken, login } from '@/src/lib/api/campus';
 
 const logoUtf = require('@/assets/logoUTF.png');
 
 type FocusedField = 'email' | 'password' | null;
+type ToastState = {
+  message: string;
+  type: AppToastType;
+};
 
 export default function LoginScreen() {
   const router = useRouter();
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [focusedField, setFocusedField] = useState<FocusedField>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [toast, setToast] = useState<ToastState | null>(null);
 
   useEffect(() => {
     async function redirectAuthenticatedUser() {
@@ -39,11 +45,30 @@ export default function LoginScreen() {
     void redirectAuthenticatedUser();
   }, [router]);
 
+  useEffect(() => {
+    return () => {
+      if (toastTimerRef.current) {
+        clearTimeout(toastTimerRef.current);
+      }
+    };
+  }, []);
+
+  function showToast(nextToast: ToastState) {
+    if (toastTimerRef.current) {
+      clearTimeout(toastTimerRef.current);
+    }
+
+    setToast(nextToast);
+    toastTimerRef.current = setTimeout(() => {
+      setToast(null);
+    }, 2600);
+  }
+
   async function handleLogin() {
     const normalizedEmail = email.trim();
 
     if (!normalizedEmail || !password) {
-      Alert.alert('Revise os dados', 'Informe e-mail e senha para entrar.');
+      showToast({ message: 'Informe e-mail e senha para entrar.', type: 'warning' });
       return;
     }
 
@@ -53,10 +78,10 @@ export default function LoginScreen() {
       await login({ email: normalizedEmail, password });
       router.replace('/perfil');
     } catch (error) {
-      Alert.alert(
-        'Não foi possível entrar',
-        error instanceof Error ? error.message : 'Verifique seus dados e tente novamente.',
-      );
+      showToast({
+        message: error instanceof Error ? error.message : 'Verifique seus dados e tente novamente.',
+        type: 'error',
+      });
     } finally {
       setIsLoading(false);
     }
@@ -143,6 +168,7 @@ export default function LoginScreen() {
           </Animatable.View>
         </View>
       </KeyboardAvoidingView>
+      <AppToast visible={Boolean(toast)} message={toast?.message ?? ''} type={toast?.type} />
     </SafeAreaView>
   );
 }

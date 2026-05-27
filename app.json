@@ -47,7 +47,7 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "Permita acessar suas fotos para selecionar o banner do evento."
+          "photosPermission": "Permita acessar suas fotos para selecionar imagens no app."
         }
       ],
       "expo-secure-store"
