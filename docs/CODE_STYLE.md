@@ -72,7 +72,7 @@ Este guia define o padrao esperado para contribuicoes no frontend.
 
 ## Git
 
-- Branches: `feature/descricao-curta`, `fix/descricao-curta`, `refactor/descricao-curta`.
+- Mantenha `main` e `develop` como referencias fixas de fluxo no repositorio.
 - Commits devem usar tipo convencional e gitmoji:
 
 ```bash

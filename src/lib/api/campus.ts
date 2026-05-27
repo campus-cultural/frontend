@@ -309,7 +309,7 @@ async function requestJson<T>(path: string, init?: RequestInit) {
     }
 
     if (__DEV__ && response.status === 404 && path.startsWith('/events')) {
-      throw new Error('Use a branch feature/events-table do backend para habilitar /events.');
+      throw new Error('Endpoint de eventos não encontrado no backend configurado.');
     }
 
     throw new Error(await getSafeErrorMessage(response, path));

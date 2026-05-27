@@ -254,11 +254,7 @@ git checkout develop
 git pull
 ```
 
-2. Crie uma branch:
-
-```bash
-git checkout -b feature/nome-da-feature
-```
+2. Crie uma branch de trabalho com nome descritivo, conforme combinado pelo time.
 
 3. Implemente a mudança seguindo `docs/CODE_STYLE.md`.
 4. Rode os checks:
@@ -277,7 +273,7 @@ git commit -m "feat: ✨ adiciona tela de exemplo"
 6. Publique:
 
 ```bash
-git push -u origin feature/nome-da-feature
+git push -u origin HEAD
 ```
 
 7. Abra PR para `develop`.
