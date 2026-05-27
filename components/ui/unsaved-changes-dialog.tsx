@@ -3,6 +3,8 @@ import * as Animatable from 'react-native-animatable';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 
 type UnsavedChangesDialogProps = {
+  cancelLabel?: string;
+  confirmLabel?: string;
   message?: string;
   onCancel: () => void;
   onDiscard: () => void;
@@ -11,6 +13,8 @@ type UnsavedChangesDialogProps = {
 };
 
 export function UnsavedChangesDialog({
+  cancelLabel = 'Continuar editando',
+  confirmLabel = 'Descartar e sair',
   message = 'As mudanças ainda não foram salvas. Se sair agora, elas serão perdidas.',
   onCancel,
   onDiscard,
@@ -32,10 +36,10 @@ export function UnsavedChangesDialog({
           <Text style={styles.message}>{message}</Text>
 
           <Pressable accessibilityRole="button" onPress={onCancel} style={styles.primaryButton}>
-            <Text style={styles.primaryText}>Continuar editando</Text>
+            <Text style={styles.primaryText}>{cancelLabel}</Text>
           </Pressable>
           <Pressable accessibilityRole="button" onPress={onDiscard} style={styles.secondaryButton}>
-            <Text style={styles.secondaryText}>Descartar e sair</Text>
+            <Text style={styles.secondaryText}>{confirmLabel}</Text>
           </Pressable>
         </Animatable.View>
       </View>

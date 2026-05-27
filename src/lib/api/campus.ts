@@ -7,7 +7,7 @@ export const API_BASE_URL = env.apiBaseUrl;
 
 export type UserRole = 'student' | 'professor' | 'admin';
 
-export type CurrentUser = {
+export type CampusUser = {
   id: number;
   role: UserRole;
   email: string;
@@ -17,6 +17,8 @@ export type CurrentUser = {
   is_active: boolean;
   ra: string | null;
 };
+
+export type CurrentUser = CampusUser;
 
 export type CampusEvent = {
   id: number;
@@ -34,18 +36,18 @@ type TokenPayload = {
   exp?: number;
 };
 
-type CreateEventPayload = {
-  image: string | null;
+export type EventCreateIn = {
+  image?: string | null;
   name: string;
   event_datetime: string;
   event_location: string;
   description: string;
 };
 
-type UpdateEventPayload = Partial<CreateEventPayload>;
+export type EventUpdateIn = Partial<EventCreateIn>;
 
-export type RegisterUserPayload = {
-  role: Exclude<UserRole, 'admin'>;
+export type UserCreateIn = {
+  role: UserRole;
   email: string;
   name: string;
   last_name: string;
@@ -55,14 +57,29 @@ export type RegisterUserPayload = {
   password: string;
 };
 
-type LoginPayload = {
+export type UserUpdateIn = {
+  role: UserRole;
+  email: string;
+  name: string;
+  last_name: string;
+  birth_date: string | null;
+  is_active: boolean;
+  ra: string | null;
+  password: string;
+};
+
+export type UserLoginIn = {
   email: string;
   password: string;
 };
 
-type TokenOut = {
+export type TokenOut = {
   access_token: string;
   token_type: string;
+};
+
+export type HealthOut = {
+  status: 'ok';
 };
 
 export class AuthSessionError extends Error {
@@ -85,7 +102,11 @@ export async function hasAuthToken() {
   }
 }
 
-export async function login(payload: LoginPayload) {
+export async function getHealth() {
+  return requestPublic<HealthOut>('/health');
+}
+
+export async function login(payload: UserLoginIn) {
   const response = await requestPublic<TokenOut>('/users/login', {
     body: JSON.stringify(payload),
     method: 'POST',
@@ -94,16 +115,45 @@ export async function login(payload: LoginPayload) {
   return response;
 }
 
-export async function registerUser(payload: RegisterUserPayload) {
+export async function refreshToken() {
+  const response = await request<TokenOut>('/users/refresh-token', {
+    method: 'POST',
+  });
+  await saveAuthToken(response.access_token);
+  return response;
+}
+
+export async function registerUser(payload: UserCreateIn) {
   return requestPublic<CurrentUser>('/users/register', {
     body: JSON.stringify(payload),
     method: 'POST',
   });
 }
 
+export async function listUsers() {
+  return request<CampusUser[]>('/users');
+}
+
+export async function getUser(userId: number) {
+  return request<CampusUser>(`/users/${userId}`);
+}
+
 export async function getCurrentUser() {
   const tokenPayload = await getTokenPayload();
-  return request<CurrentUser>(`/users/${tokenPayload.sub}`);
+  return getUser(Number(tokenPayload.sub));
+}
+
+export async function updateUser(userId: number, payload: UserUpdateIn) {
+  return request<CampusUser>(`/users/${userId}`, {
+    body: JSON.stringify(payload),
+    method: 'PUT',
+  });
+}
+
+export async function deleteUser(userId: number) {
+  return request<void>(`/users/${userId}`, {
+    method: 'DELETE',
+  });
 }
 
 export async function getProfilePictureUri(userId: number) {
@@ -136,17 +186,23 @@ export async function getEvent(eventId: number) {
   return requestPublic<CampusEvent>(`/events/${eventId}`);
 }
 
-export async function createEvent(payload: CreateEventPayload) {
+export async function createEvent(payload: EventCreateIn) {
   return request<CampusEvent>('/events', {
     body: JSON.stringify(payload),
     method: 'POST',
   });
 }
 
-export async function updateEvent(eventId: number, payload: UpdateEventPayload) {
+export async function updateEvent(eventId: number, payload: EventUpdateIn) {
   return request<CampusEvent>(`/events/${eventId}`, {
     body: JSON.stringify(payload),
     method: 'PUT',
+  });
+}
+
+export async function deleteEvent(eventId: number) {
+  return request<void>(`/events/${eventId}`, {
+    method: 'DELETE',
   });
 }
 

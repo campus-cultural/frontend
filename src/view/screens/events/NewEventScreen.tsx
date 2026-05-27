@@ -21,7 +21,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppToast, AppToastType } from '@/components/ui/app-toast';
 import { UnsavedChangesDialog } from '@/components/ui/unsaved-changes-dialog';
-import { createEvent, getEvent, isAuthSessionError, updateEvent } from '@/src/lib/api/campus';
+import { createEvent, deleteEvent, getEvent, isAuthSessionError, updateEvent } from '@/src/lib/api/campus';
 import { clearAuthToken } from '@/src/lib/auth/token';
 import { getEventImageBase64, getEventImageUri } from '@/src/lib/events/eventImage';
 import {
@@ -79,6 +79,7 @@ export default function NewEventScreen() {
   const [isDatePopoverVisible, setIsDatePopoverVisible] = useState(false);
   const [toast, setToast] = useState<ToastState | null>(null);
   const [pendingNavigation, setPendingNavigation] = useState<(() => void) | null>(null);
+  const [isDeleteDialogVisible, setIsDeleteDialogVisible] = useState(false);
   const [errors, setErrors] = useState<Partial<Record<keyof EventForm, string>>>({});
   const [isDescriptionFocused, setIsDescriptionFocused] = useState(false);
   const [isLoadingEvent, setIsLoadingEvent] = useState(false);
@@ -279,6 +280,40 @@ export default function NewEventScreen() {
       showToast({
         message:
           error instanceof Error ? error.message : 'Verifique se a API está rodando e tente novamente.',
+        type: 'error',
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  async function handleDeleteEvent() {
+    if (!isEditing || editingEventId === null) {
+      return;
+    }
+
+    setIsDeleteDialogVisible(false);
+    setIsSaving(true);
+
+    try {
+      await deleteEvent(editingEventId);
+      setSavedForm(form);
+      setSavedSelectedDate(selectedDate);
+      showToast({
+        message: 'Evento excluído com sucesso.',
+        type: 'success',
+      });
+      setTimeout(() => router.replace('/perfil' as never), 900);
+    } catch (error) {
+      if (isAuthSessionError(error)) {
+        await clearAuthToken();
+        router.replace('/login' as never);
+        return;
+      }
+
+      showToast({
+        message:
+          error instanceof Error ? error.message : 'Não foi possível excluir o evento.',
         type: 'error',
       });
     } finally {
@@ -527,6 +562,17 @@ export default function NewEventScreen() {
                 Descartar Rascunho
               </Text>
             </Pressable>
+
+            {isEditing ? (
+              <Pressable
+                accessibilityRole="button"
+                disabled={isSaving || isLoadingEvent}
+                onPress={() => setIsDeleteDialogVisible(true)}
+                style={[styles.deleteButton, isSaving || isLoadingEvent ? styles.discardButtonDisabled : null]}>
+                <MaterialIcons name="delete-outline" size={16} color="#B42318" />
+                <Text style={styles.deleteText}>Excluir Evento</Text>
+              </Pressable>
+            ) : null}
           </Animatable.View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -585,6 +631,15 @@ export default function NewEventScreen() {
         visible={Boolean(pendingNavigation)}
         onCancel={cancelPendingNavigation}
         onDiscard={discardChangesAndLeave}
+      />
+      <UnsavedChangesDialog
+        cancelLabel="Manter evento"
+        confirmLabel="Excluir evento"
+        message="Esta ação remove o evento do backend e não pode ser desfeita."
+        title="Excluir evento?"
+        visible={isDeleteDialogVisible}
+        onCancel={() => setIsDeleteDialogVisible(false)}
+        onDiscard={handleDeleteEvent}
       />
       <AppToast visible={Boolean(toast)} message={toast?.message ?? ''} type={toast?.type} />
     </SafeAreaView>
@@ -1006,6 +1061,15 @@ const styles = StyleSheet.create({
     height: 34,
     justifyContent: 'center',
   },
+  deleteButton: {
+    alignItems: 'center',
+    backgroundColor: '#FEE4E2',
+    borderRadius: 6,
+    flexDirection: 'row',
+    gap: 8,
+    height: 42,
+    justifyContent: 'center',
+  },
   discardButtonDisabled: {
     opacity: 0.52,
   },
@@ -1018,5 +1082,12 @@ const styles = StyleSheet.create({
   },
   discardTextDisabled: {
     color: '#B8BCC3',
+  },
+  deleteText: {
+    color: '#B42318',
+    fontSize: 11,
+    fontWeight: '900',
+    letterSpacing: 1,
+    textTransform: 'uppercase',
   },
 });
