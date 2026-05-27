@@ -39,17 +39,16 @@ export default function CalendarScreen() {
             (left, right) =>
               new Date(left.event_datetime).getTime() - new Date(right.event_datetime).getTime(),
           );
-          const firstEventDate = sortedEvents[0]
-            ? new Date(sortedEvents[0].event_datetime)
-            : new Date();
+          const initialEvent = sortedEvents.find((event) => !isEventInPast(event));
+          const initialDate = initialEvent ? new Date(initialEvent.event_datetime) : new Date();
 
           if (!isMounted) {
             return;
           }
 
           setEvents(sortedEvents);
-          setMonthDate(startOfMonth(firstEventDate));
-          setSelectedDate(firstEventDate);
+          setMonthDate(startOfMonth(initialDate));
+          setSelectedDate(initialDate);
         } catch (calendarError) {
           if (isAuthSessionError(calendarError)) {
             router.replace('/login' as never);
@@ -312,6 +311,10 @@ function formatSelectedDayTitle(value: Date) {
 
 function formatTimeRange(value: string) {
   return formatCampusTimeRange(value);
+}
+
+function isEventInPast(event: CampusEvent) {
+  return new Date(event.event_datetime).getTime() < Date.now();
 }
 
 const styles = StyleSheet.create({

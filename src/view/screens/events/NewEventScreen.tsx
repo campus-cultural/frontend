@@ -32,6 +32,7 @@ import {
 } from '@/src/lib/api/campus';
 import { clearAuthToken } from '@/src/lib/auth/token';
 import {
+  CAMPUS_TIME_ZONE,
   formatCampusDateTimeLabel,
   toCampusDateTimeIso,
 } from '@/src/lib/datetime/campusTime';
@@ -83,6 +84,7 @@ export default function NewEventScreen() {
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [savedSelectedDate, setSavedSelectedDate] = useState<Date | null>(null);
   const [draftDate, setDraftDate] = useState<Date>(new Date());
+  const [minimumSelectableDate, setMinimumSelectableDate] = useState<Date>(() => new Date());
   const [isDatePopoverVisible, setIsDatePopoverVisible] = useState(false);
   const { showToast, toast } = useAppToast();
   const [pendingNavigation, setPendingNavigation] = useState<(() => void) | null>(null);
@@ -205,7 +207,9 @@ export default function NewEventScreen() {
   }
 
   function openDatePicker() {
-    setDraftDate(selectedDate ?? new Date());
+    const now = new Date();
+    setMinimumSelectableDate(now);
+    setDraftDate(selectedDate && !isDateInPast(selectedDate) ? selectedDate : now);
     setIsDatePopoverVisible(true);
   }
 
@@ -214,6 +218,18 @@ export default function NewEventScreen() {
   }
 
   function applyDateTimeSelection() {
+    if (isDateInPast(draftDate)) {
+      setErrors((current) => ({
+        ...current,
+        dateTime: 'Escolha uma data e horário futuros',
+      }));
+      showToast({
+        message: 'O evento precisa ter data e horário futuros.',
+        type: 'warning',
+      });
+      return;
+    }
+
     setSelectedDate(draftDate);
     updateField('dateTime', formatDateTime(draftDate));
     setIsDatePopoverVisible(false);
@@ -227,6 +243,12 @@ export default function NewEventScreen() {
         nextErrors[field] = 'Campo obrigatório';
       }
     });
+
+    if (!selectedDate || Number.isNaN(selectedDate.getTime())) {
+      nextErrors.dateTime = 'Escolha uma data e horário válidos';
+    } else if (isDateInPast(selectedDate)) {
+      nextErrors.dateTime = 'Escolha uma data e horário futuros';
+    }
 
     setErrors(nextErrors);
     return Object.keys(nextErrors).length === 0;
@@ -244,10 +266,14 @@ export default function NewEventScreen() {
     setIsSaving(true);
 
     try {
+      if (!selectedDate) {
+        return;
+      }
+
       const payload: EventCreateIn = {
         image: form.imageBase64 || null,
         name: form.name.trim(),
-        event_datetime: toCampusDateTimeIso(selectedDate ?? new Date()),
+        event_datetime: toCampusDateTimeIso(selectedDate),
         event_location: form.place.trim(),
         description: form.description.trim(),
       };
@@ -597,8 +623,10 @@ export default function NewEventScreen() {
               date={draftDate}
               firstDayOfWeek={0}
               locale="pt-br"
+              minDate={minimumSelectableDate}
               onChange={({ date }) => handlePickerChange(date)}
               timePicker
+              timeZone={CAMPUS_TIME_ZONE}
               use12Hours={false}
               styles={{
                 ...datePickerStyles,
@@ -727,15 +755,29 @@ function toNativeDate(value: DateType) {
     return value;
   }
 
-  if (typeof value === 'string' || typeof value === 'number') {
-    return new Date(value);
+  if (value && typeof value === 'object' && 'toDate' in value) {
+    const nextDate = (value as { toDate: () => Date }).toDate();
+    return Number.isNaN(nextDate.getTime()) ? new Date() : nextDate;
   }
 
-  if (value && typeof value === 'object' && 'toDate' in value) {
-    return (value as { toDate: () => Date }).toDate();
+  if (value && typeof value === 'object' && '$d' in value) {
+    const nextDate = new Date((value as { $d: Date }).$d);
+    return Number.isNaN(nextDate.getTime()) ? new Date() : nextDate;
+  }
+
+  if (typeof value === 'string' || typeof value === 'number') {
+    const timestamp = typeof value === 'number' && value > 0 && value < 10_000_000_000
+      ? value * 1000
+      : value;
+    const nextDate = new Date(timestamp);
+    return Number.isNaN(nextDate.getTime()) ? new Date() : nextDate;
   }
 
   return new Date();
+}
+
+function isDateInPast(value: Date) {
+  return value.getTime() <= Date.now();
 }
 
 function areEventFormsEqual(left: EventForm, right: EventForm) {

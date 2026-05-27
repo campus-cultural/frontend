@@ -26,6 +26,7 @@ const campusEventSchema = z.object({
   id: z.number(),
   image: z.string().nullable(),
   name: z.string(),
+  user_id: z.number().optional(),
 });
 const healthOutSchema = z.object({
   status: z.literal('ok'),
@@ -410,8 +411,8 @@ async function requestJson<T>(path: string, init?: RequestInit, schema?: z.ZodTy
       throw new AuthSessionError();
     }
 
-    if (__DEV__ && response.status === 404 && path.startsWith('/events')) {
-      throw new Error('Endpoint de eventos não encontrado no backend configurado.');
+    if (response.status === 404 && path.startsWith('/events/')) {
+      throw new Error('Evento não encontrado ou você não tem permissão para alterá-lo.');
     }
 
     throw new Error(await getSafeErrorMessage(response, path));

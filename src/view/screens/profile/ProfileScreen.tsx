@@ -81,7 +81,8 @@ export default function ProfileScreen() {
       const currentUser = await getCurrentUser();
       const savedAvatarUri = await getProfilePictureUri(currentUser.id);
       const nextCanManageEvents = currentUser.role === 'professor' || currentUser.role === 'admin';
-      const nextEvents = nextCanManageEvents ? await listEvents() : [];
+      const apiEvents = nextCanManageEvents ? await listEvents() : [];
+      const nextEvents = filterManageableEvents(apiEvents, currentUser.id);
 
       setUser(currentUser);
       setSavedUser(currentUser);
@@ -580,6 +581,16 @@ function validateProfileData(user: CurrentUser) {
 
 function isInstitutionalEmail(email: string) {
   return /^[^\s@]+@(alunos\.)?utfpr\.edu\.br$/i.test(email);
+}
+
+function filterManageableEvents(events: CampusEvent[], currentUserId: number) {
+  const backendInformsOwner = events.some((event) => typeof event.user_id === 'number');
+
+  if (!backendInformsOwner) {
+    return events;
+  }
+
+  return events.filter((event) => event.user_id === currentUserId);
 }
 
 const styles = StyleSheet.create({
