@@ -382,7 +382,7 @@ export default function ProfileScreen() {
                     />
                   ))
                 ) : (
-                  <Text style={styles.emptyEventsText}>Nenhum evento encontrado.</Text>
+                  <Text style={styles.emptyEventsText}>Nenhum evento próprio encontrado.</Text>
                 )}
               </View>
             ) : null}
@@ -584,12 +584,6 @@ function isInstitutionalEmail(email: string) {
 }
 
 function filterManageableEvents(events: CampusEvent[], currentUserId: number) {
-  const backendInformsOwner = events.some((event) => typeof event.user_id === 'number');
-
-  if (!backendInformsOwner) {
-    return events;
-  }
-
   return events.filter((event) => event.user_id === currentUserId);
 }
 
