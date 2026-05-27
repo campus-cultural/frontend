@@ -1,19 +1,11 @@
-import { Platform } from 'react-native';
-
-const LOCAL_API_URL = Platform.OS === 'android' ? 'http://10.0.2.2:8000' : 'http://127.0.0.1:8000';
-
-function getApiBaseUrl() {
+function getApiBaseUrl(): string {
   const apiUrl = process.env.EXPO_PUBLIC_API_URL?.trim();
 
-  if (apiUrl) {
-    return apiUrl.replace(/\/$/, '');
+  if (!apiUrl) {
+    throw new Error('EXPO_PUBLIC_API_URL deve estar configurada no arquivo .env.');
   }
 
-  if (__DEV__) {
-    return LOCAL_API_URL;
-  }
-
-  throw new Error('EXPO_PUBLIC_API_URL deve estar configurada para builds de produção.');
+  return apiUrl.replace(/\/$/, '');
 }
 
 export const env = {
