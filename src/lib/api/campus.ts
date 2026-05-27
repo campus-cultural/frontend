@@ -1,4 +1,5 @@
 import { jwtDecode } from 'jwt-decode';
+import { z } from 'zod';
 
 import { clearAuthToken, getAuthToken, saveAuthToken } from '@/src/lib/auth/token';
 import { env } from '@/src/lib/config/env';
@@ -6,36 +7,48 @@ import { env } from '@/src/lib/config/env';
 export const API_BASE_URL = env.apiBaseUrl;
 const TOKEN_REFRESH_THRESHOLD_SECONDS = 5 * 60;
 
-export type UserRole = 'student' | 'professor' | 'admin';
+const userRoleSchema = z.enum(['student', 'professor', 'admin']);
+const campusUserSchema = z.object({
+  birth_date: z.string().nullable(),
+  email: z.string(),
+  id: z.number(),
+  is_active: z.boolean(),
+  last_name: z.string(),
+  name: z.string(),
+  ra: z.string().nullable(),
+  role: userRoleSchema,
+});
+const campusEventSchema = z.object({
+  created_at: z.string(),
+  description: z.string(),
+  event_datetime: z.string(),
+  event_location: z.string(),
+  id: z.number(),
+  image: z.string().nullable(),
+  name: z.string(),
+});
+const healthOutSchema = z.object({
+  status: z.literal('ok'),
+});
+const tokenOutSchema = z.object({
+  access_token: z.string().min(1),
+  token_type: z.string(),
+});
+const tokenPayloadSchema = z.object({
+  exp: z.number().optional(),
+  role: userRoleSchema,
+  sub: z.string(),
+});
 
-export type CampusUser = {
-  id: number;
-  role: UserRole;
-  email: string;
-  name: string;
-  last_name: string;
-  birth_date: string | null;
-  is_active: boolean;
-  ra: string | null;
-};
+export type UserRole = z.infer<typeof userRoleSchema>;
+
+export type CampusUser = z.infer<typeof campusUserSchema>;
 
 export type CurrentUser = CampusUser;
 
-export type CampusEvent = {
-  id: number;
-  image: string | null;
-  name: string;
-  event_datetime: string;
-  event_location: string;
-  description: string;
-  created_at: string;
-};
+export type CampusEvent = z.infer<typeof campusEventSchema>;
 
-type TokenPayload = {
-  sub: string;
-  role: UserRole;
-  exp?: number;
-};
+type TokenPayload = z.infer<typeof tokenPayloadSchema>;
 
 type AuthSession = {
   payload: TokenPayload;
@@ -70,14 +83,9 @@ export type UserLoginIn = {
   password: string;
 };
 
-export type TokenOut = {
-  access_token: string;
-  token_type: string;
-};
+export type TokenOut = z.infer<typeof tokenOutSchema>;
 
-export type HealthOut = {
-  status: 'ok';
-};
+export type HealthOut = z.infer<typeof healthOutSchema>;
 
 export class AuthSessionError extends Error {
   constructor(message = 'Sessão expirada. Faça login novamente.') {
@@ -100,14 +108,18 @@ export async function hasAuthToken() {
 }
 
 export async function getHealth() {
-  return requestPublic<HealthOut>('/health');
+  return requestPublic('/health', undefined, healthOutSchema);
 }
 
 export async function login(payload: UserLoginIn) {
-  const response = await requestPublic<TokenOut>('/users/login', {
-    body: JSON.stringify(payload),
-    method: 'POST',
-  });
+  const response = await requestPublic(
+    '/users/login',
+    {
+      body: JSON.stringify(payload),
+      method: 'POST',
+    },
+    tokenOutSchema,
+  );
   await saveAuthToken(response.access_token);
   return response;
 }
@@ -125,46 +137,62 @@ export async function refreshToken() {
     throw error;
   }
 
-  const response = await requestJson<TokenOut>('/users/refresh-token', {
-    headers: {
-      Authorization: `Bearer ${authSession.token}`,
+  const response = await requestJson(
+    '/users/refresh-token',
+    {
+      headers: {
+        Authorization: `Bearer ${authSession.token}`,
+      },
+      method: 'POST',
     },
-    method: 'POST',
-  });
+    tokenOutSchema,
+  );
   await saveAuthToken(response.access_token);
   return response;
 }
 
 export async function registerUser(payload: UserCreateIn) {
-  return requestPublic<CurrentUser>('/users/register', {
-    body: JSON.stringify(payload),
-    method: 'POST',
-  });
+  return requestPublic(
+    '/users/register',
+    {
+      body: JSON.stringify(payload),
+      method: 'POST',
+    },
+    campusUserSchema,
+  );
 }
 
 export async function listUsers() {
-  return request<CampusUser[]>('/users');
+  return request('/users', undefined, z.array(campusUserSchema));
 }
 
 export async function getUser(userId: number) {
-  return request<CampusUser>(`/users/${userId}`);
+  return request(`/users/${userId}`, undefined, campusUserSchema);
 }
 
 export async function getCurrentUser() {
   const authSession = await getValidAuthSession();
 
-  return requestJson<CampusUser>(`/users/${Number(authSession.payload.sub)}`, {
-    headers: {
-      Authorization: `Bearer ${authSession.token}`,
+  return requestJson(
+    `/users/${Number(authSession.payload.sub)}`,
+    {
+      headers: {
+        Authorization: `Bearer ${authSession.token}`,
+      },
     },
-  });
+    campusUserSchema,
+  );
 }
 
 export async function updateUser(userId: number, payload: UserUpdateIn) {
-  return request<CampusUser>(`/users/${userId}`, {
-    body: JSON.stringify(payload),
-    method: 'PUT',
-  });
+  return request(
+    `/users/${userId}`,
+    {
+      body: JSON.stringify(payload),
+      method: 'PUT',
+    },
+    campusUserSchema,
+  );
 }
 
 export async function deleteUser(userId: number) {
@@ -186,35 +214,47 @@ export async function getProfilePictureUri(userId: number) {
 export async function updateProfilePicture(userId: number, imageUri: string) {
   const imageBlob = await uriToBlob(imageUri);
 
-  return request<CurrentUser>(`/users/${userId}/profile-picture`, {
-    body: imageBlob,
-    headers: {
-      'Content-Type': 'application/octet-stream',
+  return request(
+    `/users/${userId}/profile-picture`,
+    {
+      body: imageBlob,
+      headers: {
+        'Content-Type': 'application/octet-stream',
+      },
+      method: 'POST',
     },
-    method: 'POST',
-  });
+    campusUserSchema,
+  );
 }
 
 export async function listEvents() {
-  return requestPublic<CampusEvent[]>('/events');
+  return requestPublic('/events', undefined, z.array(campusEventSchema));
 }
 
 export async function getEvent(eventId: number) {
-  return requestPublic<CampusEvent>(`/events/${eventId}`);
+  return requestPublic(`/events/${eventId}`, undefined, campusEventSchema);
 }
 
 export async function createEvent(payload: EventCreateIn) {
-  return request<CampusEvent>('/events', {
-    body: JSON.stringify(payload),
-    method: 'POST',
-  });
+  return request(
+    '/events',
+    {
+      body: JSON.stringify(payload),
+      method: 'POST',
+    },
+    campusEventSchema,
+  );
 }
 
 export async function updateEvent(eventId: number, payload: EventUpdateIn) {
-  return request<CampusEvent>(`/events/${eventId}`, {
-    body: JSON.stringify(payload),
-    method: 'PUT',
-  });
+  return request(
+    `/events/${eventId}`,
+    {
+      body: JSON.stringify(payload),
+      method: 'PUT',
+    },
+    campusEventSchema,
+  );
 }
 
 export async function deleteEvent(eventId: number) {
@@ -261,12 +301,16 @@ async function getValidAuthSession(): Promise<AuthSession> {
 }
 
 async function refreshAuthSession(authToken: string): Promise<AuthSession> {
-  const response = await requestJson<TokenOut>('/users/refresh-token', {
-    headers: {
-      Authorization: `Bearer ${authToken}`,
+  const response = await requestJson(
+    '/users/refresh-token',
+    {
+      headers: {
+        Authorization: `Bearer ${authToken}`,
+      },
+      method: 'POST',
     },
-    method: 'POST',
-  });
+    tokenOutSchema,
+  );
   await saveAuthToken(response.access_token);
   return {
     payload: getTokenPayload(response.access_token),
@@ -276,8 +320,7 @@ async function refreshAuthSession(authToken: string): Promise<AuthSession> {
 
 function getTokenPayload(authToken: string) {
   try {
-    const tokenPayload = jwtDecode<TokenPayload>(authToken);
-    return tokenPayload;
+    return tokenPayloadSchema.parse(jwtDecode<unknown>(authToken));
   } catch (error) {
     if (isAuthSessionError(error)) {
       throw error;
@@ -301,20 +344,24 @@ function isTokenExpired(tokenPayload: TokenPayload) {
   return tokenPayload.exp <= Math.floor(Date.now() / 1000);
 }
 
-async function request<T>(path: string, init?: RequestInit) {
+async function request<T>(path: string, init?: RequestInit, schema?: z.ZodType<T>) {
   const authSession = await getValidAuthSession();
 
-  return requestJson<T>(path, {
-    ...init,
-    headers: {
-      Authorization: `Bearer ${authSession.token}`,
-      ...init?.headers,
+  return requestJson(
+    path,
+    {
+      ...init,
+      headers: {
+        Authorization: `Bearer ${authSession.token}`,
+        ...init?.headers,
+      },
     },
-  });
+    schema,
+  );
 }
 
-async function requestPublic<T>(path: string, init?: RequestInit) {
-  return requestJson<T>(path, init);
+async function requestPublic<T>(path: string, init?: RequestInit, schema?: z.ZodType<T>) {
+  return requestJson(path, init, schema);
 }
 
 async function requestBlob(path: string, options?: { allowNotFound?: boolean }) {
@@ -343,7 +390,7 @@ async function requestBlob(path: string, options?: { allowNotFound?: boolean }) 
   return response.blob();
 }
 
-async function requestJson<T>(path: string, init?: RequestInit) {
+async function requestJson<T>(path: string, init?: RequestInit, schema?: z.ZodType<T>) {
   const response = await fetch(`${API_BASE_URL}${path}`, {
     ...init,
     headers: {
@@ -374,7 +421,17 @@ async function requestJson<T>(path: string, init?: RequestInit) {
     return undefined as T;
   }
 
-  return (await response.json()) as T;
+  const responseBody = await response.json();
+
+  if (!schema) {
+    return responseBody as T;
+  }
+
+  try {
+    return schema.parse(responseBody);
+  } catch {
+    throw new Error(getInvalidApiResponseMessage(path));
+  }
 }
 
 async function uriToBlob(uri: string) {
@@ -441,6 +498,18 @@ function getFallbackErrorMessage(path: string) {
   }
 
   return 'Não foi possível concluir a solicitação. Tente novamente.';
+}
+
+function getInvalidApiResponseMessage(path: string) {
+  if (path.startsWith('/events')) {
+    return 'O backend retornou eventos em um formato inesperado.';
+  }
+
+  if (path.startsWith('/users')) {
+    return 'O backend retornou dados de usuário em um formato inesperado.';
+  }
+
+  return 'O backend retornou dados em um formato inesperado.';
 }
 
 function shouldRefreshToken(tokenPayload: TokenPayload) {
