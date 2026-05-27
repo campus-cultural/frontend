@@ -21,8 +21,20 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppToast, AppToastType } from '@/components/ui/app-toast';
 import { UnsavedChangesDialog } from '@/components/ui/unsaved-changes-dialog';
-import { createEvent, deleteEvent, getEvent, isAuthSessionError, updateEvent } from '@/src/lib/api/campus';
+import {
+  createEvent,
+  deleteEvent,
+  EventCreateIn,
+  EventUpdateIn,
+  getEvent,
+  isAuthSessionError,
+  updateEvent,
+} from '@/src/lib/api/campus';
 import { clearAuthToken } from '@/src/lib/auth/token';
+import {
+  formatCampusDateTimeLabel,
+  toCampusDateTimeIso,
+} from '@/src/lib/datetime/campusTime';
 import { getEventImageBase64, getEventImageUri } from '@/src/lib/events/eventImage';
 import {
   runWithUnsavedChangesGuard,
@@ -245,16 +257,22 @@ export default function NewEventScreen() {
     setIsSaving(true);
 
     try {
-      const payload = {
+      const payload: EventCreateIn = {
         image: form.imageBase64 || null,
         name: form.name.trim(),
-        event_datetime: selectedDate?.toISOString() ?? new Date().toISOString(),
+        event_datetime: toCampusDateTimeIso(selectedDate ?? new Date()),
         event_location: form.place.trim(),
         description: form.description.trim(),
       };
 
       if (isEditing && editingEventId !== null) {
-        await updateEvent(editingEventId, payload);
+        const updatePayload: EventUpdateIn = { ...payload };
+
+        if (!hasImageChanged(form, savedForm)) {
+          delete updatePayload.image;
+        }
+
+        await updateEvent(editingEventId, updatePayload);
         setSavedForm(form);
         setSavedSelectedDate(selectedDate);
         showToast({
@@ -577,7 +595,11 @@ export default function NewEventScreen() {
         </ScrollView>
       </KeyboardAvoidingView>
 
-      <Modal transparent animationType="fade" visible={isDatePopoverVisible}>
+      <Modal
+        transparent
+        animationType="fade"
+        visible={isDatePopoverVisible}
+        onRequestClose={() => setIsDatePopoverVisible(false)}>
         <View style={styles.modalOverlay}>
           <Animatable.View
             animation="zoomIn"
@@ -712,13 +734,16 @@ function LabeledInput({
 }
 
 function formatDateTime(value: Date) {
-  const day = String(value.getDate()).padStart(2, '0');
-  const months = ['JAN', 'FEV', 'MAR', 'ABR', 'MAI', 'JUN', 'JUL', 'AGO', 'SET', 'OUT', 'NOV', 'DEZ'];
-  const month = months[value.getMonth()];
-  const hours = String(value.getHours()).padStart(2, '0');
-  const minutes = String(value.getMinutes()).padStart(2, '0');
+  return formatCampusDateTimeLabel(value);
+}
 
-  return `${day} ${month} · ${hours}:${minutes}`;
+function hasImageChanged(form: EventForm, savedForm: EventForm) {
+  return (
+    form.imageBase64 !== savedForm.imageBase64 ||
+    form.imageMimeType !== savedForm.imageMimeType ||
+    form.imageName !== savedForm.imageName ||
+    form.imageUri !== savedForm.imageUri
+  );
 }
 
 function toNativeDate(value: DateType) {

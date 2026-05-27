@@ -18,6 +18,7 @@ import {
   isAuthSessionError,
   listEvents,
 } from '@/src/lib/api/campus';
+import { formatCampusDayMonth } from '@/src/lib/datetime/campusTime';
 import { getEventImageUri } from '@/src/lib/events/eventImage';
 
 export default function HomeScreen() {
@@ -111,7 +112,6 @@ function EventCard({
   event: CampusEvent;
   index: number;
 }) {
-  const isSubscribed = index === 1;
   const imageUri = getEventImageUri(event.image);
 
   return (
@@ -140,7 +140,7 @@ function EventCard({
 
       <View style={styles.cardBody}>
         <Text style={styles.meta}>
-          <Text style={styles.metaDate}>{formatDayMonth(event.event_datetime)}</Text>
+          <Text style={styles.metaDate}>{formatCampusDayMonth(event.event_datetime)}</Text>
           {'  •  '}
           {event.event_location}
         </Text>
@@ -149,26 +149,13 @@ function EventCard({
           {event.description}
         </Text>
         <Animatable.View animation="fadeIn" delay={index * 90 + 180} useNativeDriver>
-          <Pressable
-            accessibilityRole="button"
-            style={[styles.eventButton, isSubscribed ? styles.eventButtonSubscribed : null]}>
-            <Text style={styles.eventButtonText}>{isSubscribed ? 'Inscrito' : 'Inscrever-se'}</Text>
+          <Pressable accessibilityRole="button" style={styles.eventButton}>
+            <Text style={styles.eventButtonText}>Inscrever-se</Text>
           </Pressable>
         </Animatable.View>
       </View>
     </Animatable.View>
   );
-}
-
-function formatDayMonth(value: string) {
-  return new Intl.DateTimeFormat('pt-BR', {
-    day: '2-digit',
-    month: 'short',
-    timeZone: 'UTC',
-  })
-    .format(new Date(value))
-    .replace('.', '')
-    .toUpperCase();
 }
 
 const styles = StyleSheet.create({
@@ -326,9 +313,6 @@ const styles = StyleSheet.create({
     height: 46,
     justifyContent: 'center',
     marginTop: 16,
-  },
-  eventButtonSubscribed: {
-    backgroundColor: '#2EA32B',
   },
   eventButtonText: {
     color: '#111111',

@@ -339,7 +339,11 @@ export default function RegisterScreen() {
         </ScrollView>
       </KeyboardAvoidingView>
 
-      <Modal transparent animationType="fade" visible={showBirthPicker}>
+      <Modal
+        transparent
+        animationType="fade"
+        visible={showBirthPicker}
+        onRequestClose={() => setShowBirthPicker(false)}>
         <View style={styles.modalOverlay}>
           <Animatable.View
             animation="zoomIn"

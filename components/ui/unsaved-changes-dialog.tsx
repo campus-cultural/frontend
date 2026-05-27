@@ -22,7 +22,7 @@ export function UnsavedChangesDialog({
   visible,
 }: UnsavedChangesDialogProps) {
   return (
-    <Modal transparent animationType="fade" visible={visible}>
+    <Modal transparent animationType="fade" visible={visible} onRequestClose={onCancel}>
       <View style={styles.overlay}>
         <Animatable.View
           animation="zoomIn"

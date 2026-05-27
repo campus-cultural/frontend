@@ -6,6 +6,7 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { CampusEvent, isAuthSessionError, listEvents } from '@/src/lib/api/campus';
+import { formatCampusTimeRange, getCampusDateKey } from '@/src/lib/datetime/campusTime';
 
 const weekDays = ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'];
 
@@ -277,7 +278,7 @@ function getCalendarDays(monthDate: Date) {
 
 function groupEventsByDay(events: CampusEvent[]) {
   return events.reduce((groupedEvents, event) => {
-    const dateKey = getDateKey(new Date(event.event_datetime));
+    const dateKey = getCampusDateKey(event.event_datetime);
     const currentEvents = groupedEvents.get(dateKey) ?? [];
     groupedEvents.set(dateKey, [...currentEvents, event]);
     return groupedEvents;
@@ -310,16 +311,7 @@ function formatSelectedDayTitle(value: Date) {
 }
 
 function formatTimeRange(value: string) {
-  const date = new Date(value);
-  const endDate = new Date(date.getTime() + 90 * 60 * 1000);
-  const formatter = new Intl.DateTimeFormat('pt-BR', {
-    hour: '2-digit',
-    hour12: false,
-    minute: '2-digit',
-    timeZone: 'UTC',
-  });
-
-  return `${formatter.format(date)} - ${formatter.format(endDate)}`;
+  return formatCampusTimeRange(value);
 }
 
 const styles = StyleSheet.create({

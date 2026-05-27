@@ -30,6 +30,7 @@ import {
   updateProfilePicture,
 } from '@/src/lib/api/campus';
 import { clearAuthToken } from '@/src/lib/auth/token';
+import { formatCampusTimeRange } from '@/src/lib/datetime/campusTime';
 import {
   runWithUnsavedChangesGuard,
   setUnsavedChangesHandler,
@@ -534,20 +535,7 @@ function roleLabel(role: CurrentUser['role']) {
 }
 
 function formatEventTime(value: Date) {
-  const start = new Intl.DateTimeFormat('pt-BR', {
-    hour: '2-digit',
-    hour12: false,
-    minute: '2-digit',
-    timeZone: 'UTC',
-  }).format(value);
-  const end = new Intl.DateTimeFormat('pt-BR', {
-    hour: '2-digit',
-    hour12: false,
-    minute: '2-digit',
-    timeZone: 'UTC',
-  }).format(new Date(value.getTime() + 90 * 60 * 1000));
-
-  return `${start} - ${end}`;
+  return formatCampusTimeRange(value);
 }
 
 const styles = StyleSheet.create({
