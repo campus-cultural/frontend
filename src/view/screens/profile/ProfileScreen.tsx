@@ -21,17 +21,18 @@ import { UnsavedChangesDialog } from '@/components/ui/unsaved-changes-dialog';
 import {
   CurrentUser,
   getCurrentUser,
+  getProfilePictureUri,
   hasAuthToken,
   isAuthSessionError,
   listEvents,
   CampusEvent,
+  updateProfilePicture,
 } from '@/src/lib/api/campus';
 import { clearAuthToken } from '@/src/lib/auth/token';
 import {
   runWithUnsavedChangesGuard,
   setUnsavedChangesHandler,
 } from '@/src/lib/navigation/unsavedChangesGuard';
-import { getProfileAvatarUri, saveProfileAvatarUri } from '@/src/lib/profile/avatar';
 
 type ToastState = {
   message: string;
@@ -51,6 +52,7 @@ export default function ProfileScreen() {
   const [toast, setToast] = useState<ToastState | null>(null);
   const [pendingNavigation, setPendingNavigation] = useState<(() => void) | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const canManageEvents = user?.role === 'professor' || user?.role === 'admin';
@@ -78,7 +80,7 @@ export default function ProfileScreen() {
 
     try {
       const currentUser = await getCurrentUser();
-      const savedAvatarUri = await getProfileAvatarUri(currentUser.id);
+      const savedAvatarUri = await getProfilePictureUri(currentUser.id);
       const nextCanManageEvents = currentUser.role === 'professor' || currentUser.role === 'admin';
       const nextEvents = nextCanManageEvents ? await listEvents() : [];
 
@@ -159,16 +161,37 @@ export default function ProfileScreen() {
   }
 
   async function handleUpdateProfile() {
-    if (user && profileImageUri) {
-      await saveProfileAvatarUri(user.id, profileImageUri);
-      setSavedProfileImageUri(profileImageUri);
+    if (!user) {
+      return;
     }
 
-    if (user) {
+    setIsSavingProfile(true);
+
+    try {
+      if (profileImageUri && profileImageUri !== savedProfileImageUri) {
+        await updateProfilePicture(user.id, profileImageUri);
+        setSavedProfileImageUri(profileImageUri);
+      }
+
       setSavedUser(user);
-    }
+      showToast({ message: 'Perfil salvo com sucesso.', type: 'success' });
+    } catch (profileError) {
+      if (isAuthSessionError(profileError)) {
+        await clearAuthToken();
+        router.replace('/login' as never);
+        return;
+      }
 
-    showToast({ message: 'Perfil salvo com sucesso.', type: 'success' });
+      showToast({
+        message:
+          profileError instanceof Error
+            ? profileError.message
+            : 'Não foi possível salvar o perfil.',
+        type: 'error',
+      });
+    } finally {
+      setIsSavingProfile(false);
+    }
   }
 
   async function handleChangeProfileImage() {
@@ -332,9 +355,14 @@ export default function ProfileScreen() {
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel="Atualizar dados"
+                disabled={isSavingProfile}
                 onPress={handleUpdateProfile}
-                style={styles.primaryButton}>
-                <MaterialIcons name="save" size={15} color="#111111" />
+                style={[styles.primaryButton, isSavingProfile ? styles.buttonDisabled : null]}>
+                {isSavingProfile ? (
+                  <ActivityIndicator color="#111111" />
+                ) : (
+                  <MaterialIcons name="save" size={15} color="#111111" />
+                )}
                 <Text style={styles.primaryButtonText}>Atualizar dados</Text>
               </Pressable>
             </Animatable.View>
@@ -357,8 +385,9 @@ export default function ProfileScreen() {
                 <Pressable
                   accessibilityRole="button"
                   accessibilityLabel="Salvar foto de perfil"
+                  disabled={isSavingProfile}
                   onPress={handleUpdateProfile}
-                  style={styles.secondaryButton}>
+                  style={[styles.secondaryButton, isSavingProfile ? styles.buttonDisabled : null]}>
                   <MaterialIcons name="save" size={15} color="#4C535C" />
                   <Text style={styles.secondaryButtonText}>Salvar foto</Text>
                 </Pressable>
@@ -716,6 +745,9 @@ const styles = StyleSheet.create({
   },
   createEventButton: {
     marginTop: -5,
+  },
+  buttonDisabled: {
+    opacity: 0.7,
   },
   primaryButtonText: {
     color: '#111111',

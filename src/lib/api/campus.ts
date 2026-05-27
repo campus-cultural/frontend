@@ -106,12 +106,34 @@ export async function getCurrentUser() {
   return request<CurrentUser>(`/users/${tokenPayload.sub}`);
 }
 
+export async function getProfilePictureUri(userId: number) {
+  const imageBlob = await requestBlob(`/users/${userId}/profile-picture`, { allowNotFound: true });
+
+  if (!imageBlob) {
+    return null;
+  }
+
+  return blobToDataUri(imageBlob);
+}
+
+export async function updateProfilePicture(userId: number, imageUri: string) {
+  const imageBlob = await uriToBlob(imageUri);
+
+  return request<CurrentUser>(`/users/${userId}/profile-picture`, {
+    body: imageBlob,
+    headers: {
+      'Content-Type': 'application/octet-stream',
+    },
+    method: 'POST',
+  });
+}
+
 export async function listEvents() {
-  return request<CampusEvent[]>('/events');
+  return requestPublic<CampusEvent[]>('/events');
 }
 
 export async function getEvent(eventId: number) {
-  return request<CampusEvent>(`/events/${eventId}`);
+  return requestPublic<CampusEvent>(`/events/${eventId}`);
 }
 
 export async function createEvent(payload: CreateEventPayload) {
@@ -186,6 +208,39 @@ async function requestPublic<T>(path: string, init?: RequestInit) {
   return requestJson<T>(path, init);
 }
 
+async function requestBlob(path: string, options?: { allowNotFound?: boolean }) {
+  const authToken = await getAuthToken();
+
+  if (!authToken) {
+    await clearAuthToken();
+    throw new AuthSessionError('Faça login para autenticar com o backend.');
+  }
+
+  await getTokenPayload();
+
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    headers: {
+      Accept: 'application/octet-stream',
+      Authorization: `Bearer ${authToken}`,
+    },
+  });
+
+  if (options?.allowNotFound && response.status === 404) {
+    return null;
+  }
+
+  if (!response.ok) {
+    if (response.status === 401) {
+      await clearAuthToken();
+      throw new AuthSessionError();
+    }
+
+    throw new Error(await getSafeErrorMessage(response, path));
+  }
+
+  return response.blob();
+}
+
 async function requestJson<T>(path: string, init?: RequestInit) {
   const response = await fetch(`${API_BASE_URL}${path}`, {
     ...init,
@@ -218,6 +273,49 @@ async function requestJson<T>(path: string, init?: RequestInit) {
   }
 
   return (await response.json()) as T;
+}
+
+async function uriToBlob(uri: string) {
+  const response = await fetch(uri);
+  return response.blob();
+}
+
+function blobToDataUri(blob: Blob) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+
+    reader.onerror = () => reject(new Error('Não foi possível ler a imagem de perfil.'));
+    reader.onloadend = () => {
+      if (typeof reader.result !== 'string') {
+        reject(new Error('Não foi possível carregar a imagem de perfil.'));
+        return;
+      }
+
+      const base64 = reader.result.split(',')[1] ?? '';
+      resolve(`data:${getImageMimeType(base64)};base64,${base64}`);
+    };
+    reader.readAsDataURL(blob);
+  });
+}
+
+function getImageMimeType(base64: string) {
+  if (base64.startsWith('iVBOR')) {
+    return 'image/png';
+  }
+
+  if (base64.startsWith('/9j/')) {
+    return 'image/jpeg';
+  }
+
+  if (base64.startsWith('R0lG')) {
+    return 'image/gif';
+  }
+
+  if (base64.startsWith('UklGR')) {
+    return 'image/webp';
+  }
+
+  return 'image/jpeg';
 }
 
 async function getSafeErrorMessage(response: Response, path: string) {
