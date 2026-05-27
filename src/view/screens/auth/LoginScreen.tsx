@@ -1,6 +1,6 @@
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useRouter } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import * as Animatable from 'react-native-animatable';
 import {
   ActivityIndicator,
@@ -15,25 +15,21 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { AppToast, AppToastType } from '@/components/ui/app-toast';
+import { AppToast } from '@/components/ui/app-toast';
 import { hasAuthToken, login } from '@/src/lib/api/campus';
+import { useAppToast } from '@/src/view/hooks/useAppToast';
 
 const logoUtf = require('@/assets/logoUTF.png');
 
 type FocusedField = 'email' | 'password' | null;
-type ToastState = {
-  message: string;
-  type: AppToastType;
-};
 
 export default function LoginScreen() {
   const router = useRouter();
-  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [focusedField, setFocusedField] = useState<FocusedField>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [toast, setToast] = useState<ToastState | null>(null);
+  const { showToast, toast } = useAppToast();
 
   useEffect(() => {
     async function redirectAuthenticatedUser() {
@@ -44,25 +40,6 @@ export default function LoginScreen() {
 
     void redirectAuthenticatedUser();
   }, [router]);
-
-  useEffect(() => {
-    return () => {
-      if (toastTimerRef.current) {
-        clearTimeout(toastTimerRef.current);
-      }
-    };
-  }, []);
-
-  function showToast(nextToast: ToastState) {
-    if (toastTimerRef.current) {
-      clearTimeout(toastTimerRef.current);
-    }
-
-    setToast(nextToast);
-    toastTimerRef.current = setTimeout(() => {
-      setToast(null);
-    }, 2600);
-  }
 
   async function handleLogin() {
     const normalizedEmail = email.trim();

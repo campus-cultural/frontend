@@ -19,7 +19,7 @@ import {
 import DatePicker, { DateType, useDefaultStyles } from 'react-native-ui-datepicker';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { AppToast, AppToastType } from '@/components/ui/app-toast';
+import { AppToast } from '@/components/ui/app-toast';
 import { UnsavedChangesDialog } from '@/components/ui/unsaved-changes-dialog';
 import {
   createEvent,
@@ -40,6 +40,7 @@ import {
   runWithUnsavedChangesGuard,
   setUnsavedChangesHandler,
 } from '@/src/lib/navigation/unsavedChangesGuard';
+import { useAppToast } from '@/src/view/hooks/useAppToast';
 
 const DESCRIPTION_LIMIT = 500;
 
@@ -72,14 +73,8 @@ const requiredFields: (keyof Pick<EventForm, 'name' | 'dateTime' | 'place' | 'de
   'description',
 ];
 
-type ToastState = {
-  message: string;
-  type: AppToastType;
-};
-
 export default function NewEventScreen() {
   const router = useRouter();
-  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { eventId } = useLocalSearchParams<{ eventId?: string }>();
   const datePickerStyles = useDefaultStyles();
   const editingEventId = eventId ? Number(eventId) : null;
@@ -89,7 +84,7 @@ export default function NewEventScreen() {
   const [savedSelectedDate, setSavedSelectedDate] = useState<Date | null>(null);
   const [draftDate, setDraftDate] = useState<Date>(new Date());
   const [isDatePopoverVisible, setIsDatePopoverVisible] = useState(false);
-  const [toast, setToast] = useState<ToastState | null>(null);
+  const { showToast, toast } = useAppToast();
   const [pendingNavigation, setPendingNavigation] = useState<(() => void) | null>(null);
   const [isDeleteDialogVisible, setIsDeleteDialogVisible] = useState(false);
   const [errors, setErrors] = useState<Partial<Record<keyof EventForm, string>>>({});
@@ -155,15 +150,7 @@ export default function NewEventScreen() {
     }
 
     void loadEventForEditing();
-  }, [editingEventId, isEditing, router]);
-
-  useEffect(() => {
-    return () => {
-      if (toastTimerRef.current) {
-        clearTimeout(toastTimerRef.current);
-      }
-    };
-  }, []);
+  }, [editingEventId, isEditing, router, showToast]);
 
   useFocusEffect(
     useCallback(() => {
@@ -355,17 +342,6 @@ export default function NewEventScreen() {
     setDraftDate(savedSelectedDate ?? new Date());
     setIsDatePopoverVisible(false);
     setErrors({});
-  }
-
-  function showToast(nextToast: ToastState) {
-    if (toastTimerRef.current) {
-      clearTimeout(toastTimerRef.current);
-    }
-
-    setToast(nextToast);
-    toastTimerRef.current = setTimeout(() => {
-      setToast(null);
-    }, 2600);
   }
 
   const requestLeave = useCallback(

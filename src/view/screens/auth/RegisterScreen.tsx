@@ -17,8 +17,9 @@ import {
 import DatePicker, { DateType, useDefaultStyles } from 'react-native-ui-datepicker';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { AppToast, AppToastType } from '@/components/ui/app-toast';
+import { AppToast } from '@/components/ui/app-toast';
 import { login, registerUser, UserRole } from '@/src/lib/api/campus';
+import { useAppToast } from '@/src/view/hooks/useAppToast';
 
 type RegisterRole = Exclude<UserRole, 'admin'>;
 
@@ -34,10 +35,6 @@ type RegisterForm = {
 };
 
 type RegisterErrors = Partial<Record<keyof RegisterForm, string>>;
-type ToastState = {
-  message: string;
-  type: AppToastType;
-};
 
 const initialForm: RegisterForm = {
   role: 'student',
@@ -52,7 +49,6 @@ const initialForm: RegisterForm = {
 
 export default function RegisterScreen() {
   const router = useRouter();
-  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const navigationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const datePickerStyles = useDefaultStyles();
   const [form, setForm] = useState<RegisterForm>(initialForm);
@@ -60,7 +56,7 @@ export default function RegisterScreen() {
   const [draftBirthDate, setDraftBirthDate] = useState<Date>(new Date(2000, 0, 1));
   const [showBirthPicker, setShowBirthPicker] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [toast, setToast] = useState<ToastState | null>(null);
+  const { showToast, toast } = useAppToast();
 
   const isStudent = form.role === 'student';
   const birthDateLabel = useMemo(
@@ -75,26 +71,11 @@ export default function RegisterScreen() {
 
   useEffect(() => {
     return () => {
-      if (toastTimerRef.current) {
-        clearTimeout(toastTimerRef.current);
-      }
-
       if (navigationTimerRef.current) {
         clearTimeout(navigationTimerRef.current);
       }
     };
   }, []);
-
-  function showToast(nextToast: ToastState) {
-    if (toastTimerRef.current) {
-      clearTimeout(toastTimerRef.current);
-    }
-
-    setToast(nextToast);
-    toastTimerRef.current = setTimeout(() => {
-      setToast(null);
-    }, 2600);
-  }
 
   function openBirthDatePicker() {
     setDraftBirthDate(form.birthDate ?? new Date(2000, 0, 1));

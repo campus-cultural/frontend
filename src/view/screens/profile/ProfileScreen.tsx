@@ -2,7 +2,7 @@ import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import * as Animatable from 'react-native-animatable';
 import {
   ActivityIndicator,
@@ -16,7 +16,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { AppToast, AppToastType } from '@/components/ui/app-toast';
+import { AppToast } from '@/components/ui/app-toast';
 import { UnsavedChangesDialog } from '@/components/ui/unsaved-changes-dialog';
 import {
   CurrentUser,
@@ -36,15 +36,10 @@ import {
   runWithUnsavedChangesGuard,
   setUnsavedChangesHandler,
 } from '@/src/lib/navigation/unsavedChangesGuard';
-
-type ToastState = {
-  message: string;
-  type: AppToastType;
-};
+import { useAppToast } from '@/src/view/hooks/useAppToast';
 
 export default function ProfileScreen() {
   const router = useRouter();
-  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [user, setUser] = useState<CurrentUser | null>(null);
   const [savedUser, setSavedUser] = useState<CurrentUser | null>(null);
   const [profileImageUri, setProfileImageUri] = useState<string | null>(null);
@@ -53,7 +48,7 @@ export default function ProfileScreen() {
   const [eventSearch, setEventSearch] = useState('');
   const [currentPassword, setCurrentPassword] = useState('');
   const [isSearchFocused, setIsSearchFocused] = useState(false);
-  const [toast, setToast] = useState<ToastState | null>(null);
+  const { showToast, toast } = useAppToast();
   const [pendingNavigation, setPendingNavigation] = useState<(() => void) | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
@@ -129,25 +124,6 @@ export default function ProfileScreen() {
       });
     }, [hasUnsavedProfileChanges]),
   );
-
-  useEffect(() => {
-    return () => {
-      if (toastTimerRef.current) {
-        clearTimeout(toastTimerRef.current);
-      }
-    };
-  }, []);
-
-  function showToast(nextToast: ToastState) {
-    if (toastTimerRef.current) {
-      clearTimeout(toastTimerRef.current);
-    }
-
-    setToast(nextToast);
-    toastTimerRef.current = setTimeout(() => {
-      setToast(null);
-    }, 2600);
-  }
 
   function updateUserField(field: 'email' | 'last_name' | 'name', value: string) {
     setUser((current) => (current ? { ...current, [field]: value } : current));

@@ -238,7 +238,6 @@ app/                  rotas do Expo Router, finas e sem regra de negócio
 src/lib/              integrações, configuração e serviços de baixo nível
 src/view/screens/     telas completas por domínio
 components/           componentes herdados do template/base
-constants/            tokens e constantes visuais globais
 assets/               imagens, fontes e arquivos estáticos
 docs/                 guias internos do projeto
 ```

@@ -5,8 +5,9 @@ import { useCallback, useState } from 'react';
 import * as Animatable from 'react-native-animatable';
 import {
   ActivityIndicator,
+  FlatList,
+  ListRenderItem,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -25,6 +26,10 @@ export default function HomeScreen() {
   const router = useRouter();
   const [events, setEvents] = useState<CampusEvent[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const renderEvent = useCallback<ListRenderItem<CampusEvent>>(
+    ({ item, index }) => <EventCard event={item} index={index} />,
+    [],
+  );
 
   useFocusEffect(
     useCallback(() => {
@@ -67,41 +72,52 @@ export default function HomeScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <Animatable.Text
-          animation="fadeInDown"
-          duration={420}
-          style={styles.headerTitle}
-          useNativeDriver>
-          UTFPR CULTURA
-        </Animatable.Text>
-
-        {isLoading ? (
-          <Animatable.View
-            animation="pulse"
-            iterationCount="infinite"
-            style={styles.loadingRow}
-            useNativeDriver>
-            <ActivityIndicator color="#111111" />
-            <Text style={styles.loadingText}>Atualizando eventos...</Text>
-          </Animatable.View>
-        ) : null}
-
-        {events.map((event, index) => (
-          <EventCard event={event} index={index} key={event.id} />
-        ))}
-
-        {!isLoading && events.length === 0 ? (
-          <Animatable.Text
-            animation="fadeIn"
-            duration={360}
-            style={styles.emptyText}
-            useNativeDriver>
-            Nenhum evento disponível no momento.
-          </Animatable.Text>
-        ) : null}
-      </ScrollView>
+      <FlatList
+        contentContainerStyle={styles.content}
+        data={events}
+        initialNumToRender={4}
+        keyExtractor={keyExtractor}
+        ListEmptyComponent={!isLoading ? EmptyEvents : null}
+        ListHeaderComponent={<HomeHeader isLoading={isLoading} />}
+        maxToRenderPerBatch={5}
+        renderItem={renderEvent}
+        showsVerticalScrollIndicator={false}
+        windowSize={7}
+      />
     </SafeAreaView>
+  );
+}
+
+function HomeHeader({ isLoading }: { isLoading: boolean }) {
+  return (
+    <>
+      <Animatable.Text
+        animation="fadeInDown"
+        duration={420}
+        style={styles.headerTitle}
+        useNativeDriver>
+        UTFPR CULTURA
+      </Animatable.Text>
+
+      {isLoading ? (
+        <Animatable.View
+          animation="pulse"
+          iterationCount="infinite"
+          style={styles.loadingRow}
+          useNativeDriver>
+          <ActivityIndicator color="#111111" />
+          <Text style={styles.loadingText}>Atualizando eventos...</Text>
+        </Animatable.View>
+      ) : null}
+    </>
+  );
+}
+
+function EmptyEvents() {
+  return (
+    <Animatable.Text animation="fadeIn" duration={360} style={styles.emptyText} useNativeDriver>
+      Nenhum evento disponível no momento.
+    </Animatable.Text>
   );
 }
 
@@ -156,6 +172,10 @@ function EventCard({
       </View>
     </Animatable.View>
   );
+}
+
+function keyExtractor(event: CampusEvent) {
+  return String(event.id);
 }
 
 const styles = StyleSheet.create({
