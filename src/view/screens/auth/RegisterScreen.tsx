@@ -60,7 +60,7 @@ export default function RegisterScreen() {
 
   const isStudent = form.role === 'student';
   const birthDateLabel = useMemo(
-    () => (form.birthDate ? formatDisplayDate(form.birthDate) : 'dd/mm/aaaa'),
+    () => (form.birthDate ? formatDisplayDate(form.birthDate) : '31/01/1998'),
     [form.birthDate],
   );
 
@@ -265,7 +265,7 @@ export default function RegisterScreen() {
                 icon="person-outline"
                 label="Nome e Sobrenome"
                 onChangeText={(value) => updateField('fullName', value)}
-                placeholder="Ex: João Silva"
+                placeholder="Ex: Mariana Costa"
                 value={form.fullName}
               />
             ) : (
@@ -275,7 +275,7 @@ export default function RegisterScreen() {
                   icon="person-outline"
                   label="Nome"
                   onChangeText={(value) => updateField('name', value)}
-                  placeholder="Ex: Erinaldo"
+                  placeholder="Ex: Mariana"
                   value={form.name}
                 />
                 <FormInput
@@ -283,7 +283,7 @@ export default function RegisterScreen() {
                   icon="person-outline"
                   label="Sobrenome"
                   onChangeText={(value) => updateField('lastName', value)}
-                  placeholder="Ex: Gomes"
+                  placeholder="Ex: Costa"
                   value={form.lastName}
                 />
               </>
@@ -296,7 +296,7 @@ export default function RegisterScreen() {
               keyboardType="email-address"
               label={isStudent ? 'E-mail' : 'E-mail Institucional'}
               onChangeText={(value) => updateField('email', value)}
-              placeholder={isStudent ? 'nome@utfpr.edu.br' : 'nome@utfpr.edu.br'}
+              placeholder="usuario@utfpr.edu.br"
               value={form.email}
             />
 
@@ -326,7 +326,7 @@ export default function RegisterScreen() {
               icon="lock-outline"
               label="Senha"
               onChangeText={(value) => updateField('password', value)}
-              placeholder="••••••••"
+              placeholder="Mínimo 8 caracteres"
               secureTextEntry
               value={form.password}
             />
@@ -336,7 +336,7 @@ export default function RegisterScreen() {
               icon="shield"
               label="Confirmar Senha"
               onChangeText={(value) => updateField('confirmPassword', value)}
-              placeholder="••••••••"
+              placeholder="Repita sua senha"
               secureTextEntry
               value={form.confirmPassword}
             />

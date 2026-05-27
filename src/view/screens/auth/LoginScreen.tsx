@@ -96,7 +96,7 @@ export default function LoginScreen() {
                   onBlur={() => setFocusedField(null)}
                   onChangeText={setEmail}
                   onFocus={() => setFocusedField('email')}
-                  placeholder="Insira seu email institucional"
+                  placeholder="usuario@utfpr.edu.br"
                   placeholderTextColor="#B9B9B9"
                   style={styles.input}
                   value={email}
@@ -113,7 +113,7 @@ export default function LoginScreen() {
                   onBlur={() => setFocusedField(null)}
                   onChangeText={setPassword}
                   onFocus={() => setFocusedField('password')}
-                  placeholder="Insira sua senha"
+                  placeholder="Digite sua senha"
                   placeholderTextColor="#B9B9B9"
                   secureTextEntry
                   style={styles.input}

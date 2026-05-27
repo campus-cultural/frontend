@@ -141,7 +141,7 @@ export default function ForgotPasswordScreen() {
                   }
                 }}
                 onFocus={() => setIsEmailFocused(true)}
-                placeholder="exemplo@alunos.utfpr.edu.br"
+                placeholder="usuario@utfpr.edu.br"
                 placeholderTextColor="#9E9E9E"
                 style={styles.textInput}
                 value={email}

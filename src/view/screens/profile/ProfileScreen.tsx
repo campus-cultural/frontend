@@ -343,7 +343,7 @@ export default function ProfileScreen() {
                 delay={340}
                 label="Senha atual"
                 onChangeText={setCurrentPassword}
-                placeholder="Confirme sua senha para salvar"
+                placeholder="Digite sua senha atual"
                 secureTextEntry
                 value={currentPassword}
               />
@@ -358,7 +358,7 @@ export default function ProfileScreen() {
                     onBlur={() => setIsSearchFocused(false)}
                     onChangeText={setEventSearch}
                     onFocus={() => setIsSearchFocused(true)}
-                    placeholder="Pesquisa de Eventos..."
+                    placeholder="Buscar eventos..."
                     placeholderTextColor="#C0C2C7"
                     style={styles.searchInput}
                     value={eventSearch}

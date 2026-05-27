@@ -461,7 +461,7 @@ export default function NewEventScreen() {
               error={errors.name}
               label="Nome do Evento"
               onChangeText={(value) => updateField('name', value)}
-              placeholder="Ex: Festival de Jazz da Primavera"
+              placeholder="Ex: Workshop de Produto Digital"
               value={form.name}
             />
 
@@ -473,7 +473,7 @@ export default function NewEventScreen() {
               onPress={openDatePicker}
               onPressIcon={openDatePicker}
               onChangeText={(value) => updateField('dateTime', value)}
-              placeholder="24 OUT · 19:30"
+              placeholder="15 AGO · 09:00"
               rightIcon="calendar-today"
               value={form.dateTime}
             />
@@ -501,7 +501,7 @@ export default function NewEventScreen() {
               error={errors.place}
               label="Local"
               onChangeText={(value) => updateField('place', value)}
-              placeholder="Auditório Central"
+              placeholder="Centro de Convenções"
               rightIcon="place"
               value={form.place}
             />
@@ -517,7 +517,7 @@ export default function NewEventScreen() {
                 onBlur={() => setIsDescriptionFocused(false)}
                 onChangeText={(value) => updateField('description', value)}
                 onFocus={() => setIsDescriptionFocused(true)}
-                placeholder="Descreva os detalhes do evento, palestrantes e pré-requisitos..."
+                placeholder="Informe agenda, público-alvo, responsáveis e requisitos..."
                 placeholderTextColor="#B9BDC4"
                 style={[
                   styles.descriptionInput,
