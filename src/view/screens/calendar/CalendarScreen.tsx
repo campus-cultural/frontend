@@ -2,80 +2,102 @@ import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import * as Animatable from 'react-native-animatable';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  useWindowDimensions,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { CampusEvent, isAuthSessionError, listEvents } from '@/src/lib/api/campus';
 import { formatCampusTimeRange, getCampusDateKey } from '@/src/lib/datetime/campusTime';
 
+const PRIMARY_COLOR = '#FFCC00';
 const weekDays = ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'];
+
+
+type AgendaFilter = 'all' | 'enrolled';
 
 export default function CalendarScreen() {
   const router = useRouter();
+  const { width } = useWindowDimensions();
   const [events, setEvents] = useState<CampusEvent[]>([]);
   const [monthDate, setMonthDate] = useState(() => startOfMonth(new Date()));
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [filter, setFilter] = useState<AgendaFilter>('all');
+  const [enrolledEventIds, setEnrolledEventIds] = useState<Set<number>>(new Set());
   const [isLoading, setIsLoading] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const monthDays = useMemo(() => getCalendarDays(monthDate), [monthDate]);
+  const compactMode = width < 360;
+  const monthDays = useMemo(() => getVisibleMonthDays(monthDate), [monthDate]);
   const eventsByDay = useMemo(() => groupEventsByDay(events), [events]);
-  const selectedDayEvents = useMemo(
-    () => (selectedDate ? eventsByDay.get(getDateKey(selectedDate)) ?? [] : []),
-    [eventsByDay, selectedDate],
+  const filteredEventsByDay = useMemo(() => {
+    if (filter === 'all') {
+      return eventsByDay;
+    }
+
+    return groupEventsByDay(events.filter((event) => enrolledEventIds.has(event.id)));
+  }, [enrolledEventIds, events, eventsByDay, filter]);
+  const selectedDayEvents = useMemo(() => {
+    if (!selectedDate) {
+      return [];
+    }
+
+    return filteredEventsByDay.get(getDateKey(selectedDate)) ?? [];
+  }, [filteredEventsByDay, selectedDate]);
+
+  const loadEvents = useCallback(
+    async (options?: { refreshing?: boolean }) => {
+      if (options?.refreshing) {
+        setIsRefreshing(true);
+      } else {
+        setIsLoading(true);
+      }
+      setError(null);
+
+      try {
+        const apiEvents = await listEvents();
+        const sortedEvents = [...apiEvents].sort(
+          (left, right) =>
+            new Date(left.event_datetime).getTime() - new Date(right.event_datetime).getTime(),
+        );
+        const initialEvent = sortedEvents.find((event) => !isEventInPast(event)) ?? sortedEvents[0];
+        const initialDate = initialEvent ? new Date(initialEvent.event_datetime) : new Date();
+
+        setEvents(sortedEvents);
+        setMonthDate(startOfMonth(initialDate));
+        setSelectedDate((currentSelectedDate) => currentSelectedDate ?? initialDate);
+      } catch (calendarError) {
+        if (isAuthSessionError(calendarError)) {
+          router.replace('/login' as never);
+          return;
+        }
+
+        setEvents([]);
+        setError(
+          calendarError instanceof Error
+            ? calendarError.message
+            : 'Não foi possível carregar a agenda.',
+        );
+      } finally {
+        setIsLoading(false);
+        setIsRefreshing(false);
+      }
+    },
+    [router],
   );
 
   useFocusEffect(
     useCallback(() => {
-      let isMounted = true;
-
-      async function loadEvents() {
-        setIsLoading(true);
-        setError(null);
-
-        try {
-          const apiEvents = await listEvents();
-          const sortedEvents = [...apiEvents].sort(
-            (left, right) =>
-              new Date(left.event_datetime).getTime() - new Date(right.event_datetime).getTime(),
-          );
-          const initialEvent = sortedEvents.find((event) => !isEventInPast(event));
-          const initialDate = initialEvent ? new Date(initialEvent.event_datetime) : new Date();
-
-          if (!isMounted) {
-            return;
-          }
-
-          setEvents(sortedEvents);
-          setMonthDate(startOfMonth(initialDate));
-          setSelectedDate(initialDate);
-        } catch (calendarError) {
-          if (isAuthSessionError(calendarError)) {
-            router.replace('/login' as never);
-            return;
-          }
-
-          if (isMounted) {
-            setEvents([]);
-            setError(
-              calendarError instanceof Error
-                ? calendarError.message
-                : 'Não foi possível carregar a agenda.',
-            );
-          }
-        } finally {
-          if (isMounted) {
-            setIsLoading(false);
-          }
-        }
-      }
-
       void loadEvents();
-
-      return () => {
-        isMounted = false;
-      };
-    }, [router]),
+    }, [loadEvents]),
   );
 
   function goToPreviousMonth() {
@@ -88,9 +110,33 @@ export default function CalendarScreen() {
     setSelectedDate(null);
   }
 
+  function toggleEnrollment(eventId: number) {
+    setEnrolledEventIds((current) => {
+      const next = new Set(current);
+
+      if (next.has(eventId)) {
+        next.delete(eventId);
+      } else {
+        next.add(eventId);
+      }
+
+      return next;
+    });
+  }
+
   return (
     <SafeAreaView style={styles.safeArea}>
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={[styles.content, compactMode ? styles.contentCompact : null]}
+        refreshControl={
+          <RefreshControl
+            colors={[PRIMARY_COLOR]}
+            onRefresh={() => void loadEvents({ refreshing: true })}
+            refreshing={isRefreshing}
+            tintColor={PRIMARY_COLOR}
+          />
+        }
+        showsVerticalScrollIndicator={false}>
         <Animatable.View
           animation="fadeInDown"
           duration={360}
@@ -98,7 +144,9 @@ export default function CalendarScreen() {
           useNativeDriver>
           <View style={styles.headerSpacer} />
           <Text style={styles.headerTitle}>Agenda</Text>
-          <MaterialIcons name="search" size={20} color="#111111" />
+          <Pressable accessibilityRole="button" hitSlop={10}>
+            <MaterialIcons name="search" size={22} color="#111111" />
+          </Pressable>
         </Animatable.View>
 
         <Animatable.View
@@ -112,16 +160,18 @@ export default function CalendarScreen() {
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="Mês anterior"
-              hitSlop={10}
-              onPress={goToPreviousMonth}>
-              <MaterialIcons name="chevron-left" size={18} color="#69707A" />
+              hitSlop={12}
+              onPress={goToPreviousMonth}
+              style={styles.monthButton}>
+              <MaterialIcons name="chevron-left" size={20} color="#505761" />
             </Pressable>
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="Próximo mês"
-              hitSlop={10}
-              onPress={goToNextMonth}>
-              <MaterialIcons name="chevron-right" size={18} color="#69707A" />
+              hitSlop={12}
+              onPress={goToNextMonth}
+              style={styles.monthButton}>
+              <MaterialIcons name="chevron-right" size={20} color="#505761" />
             </Pressable>
           </View>
         </Animatable.View>
@@ -132,12 +182,12 @@ export default function CalendarScreen() {
           duration={360}
           style={styles.filters}
           useNativeDriver>
-          <View style={[styles.filterPill, styles.filterPillActive]}>
-            <Text style={[styles.filterText, styles.filterTextActive]}>Todos</Text>
-          </View>
-          <View style={styles.filterPill}>
-            <Text style={styles.filterText}>Inscritos</Text>
-          </View>
+          <FilterPill active={filter === 'all'} label="Todos" onPress={() => setFilter('all')} />
+          <FilterPill
+            active={filter === 'enrolled'}
+            label="Inscritos"
+            onPress={() => setFilter('enrolled')}
+          />
         </Animatable.View>
 
         {isLoading ? (
@@ -170,26 +220,31 @@ export default function CalendarScreen() {
               </Text>
             ))}
           </View>
+
           <View style={styles.daysGrid}>
-            {monthDays.map((day, index) => {
-              if (!day) {
-                return <View key={`blank-${index}`} style={styles.dayCell} />;
+            {monthDays.map((calendarDay) => {
+              if (!calendarDay.day) {
+                return <View key={calendarDay.key} style={styles.dayCell} />;
               }
 
-              const dayDate = new Date(monthDate.getFullYear(), monthDate.getMonth(), day);
+              const dayDate = new Date(
+                monthDate.getFullYear(),
+                monthDate.getMonth(),
+                calendarDay.day,
+              );
               const dateKey = getDateKey(dayDate);
               const isSelected = selectedDate ? getDateKey(selectedDate) === dateKey : false;
-              const hasEvent = eventsByDay.has(dateKey);
+              const hasEvent = filteredEventsByDay.has(dateKey);
 
               return (
-                <View key={day} style={styles.dayCell}>
+                <View key={calendarDay.key} style={styles.dayCell}>
                   <Pressable
                     accessibilityRole="button"
-                    accessibilityLabel={`Selecionar dia ${day}`}
+                    accessibilityLabel={`Selecionar dia ${calendarDay.day}`}
                     onPress={() => setSelectedDate(dayDate)}
                     style={[styles.dayCircle, isSelected ? styles.dayCircleActive : null]}>
                     <Text style={[styles.dayText, isSelected ? styles.dayTextActive : null]}>
-                      {day}
+                      {calendarDay.day}
                     </Text>
                   </Pressable>
                   {hasEvent && !isSelected ? <View style={styles.eventDot} /> : null}
@@ -210,7 +265,13 @@ export default function CalendarScreen() {
 
         <View style={styles.eventList}>
           {selectedDayEvents.map((event, index) => (
-            <AgendaCard event={event} index={index} key={event.id} />
+            <AgendaCard
+              enrolled={enrolledEventIds.has(event.id)}
+              event={event}
+              index={index}
+              key={event.id}
+              onToggleEnrollment={() => toggleEnrollment(event.id)}
+            />
           ))}
 
           {!isLoading && selectedDate && selectedDayEvents.length === 0 ? (
@@ -219,7 +280,9 @@ export default function CalendarScreen() {
               duration={320}
               style={styles.emptyText}
               useNativeDriver>
-              Nenhum evento para este dia.
+              {filter === 'enrolled'
+                ? 'Nenhum evento inscrito para este dia.'
+                : 'Nenhum evento para este dia.'}
             </Animatable.Text>
           ) : null}
         </View>
@@ -228,12 +291,35 @@ export default function CalendarScreen() {
   );
 }
 
+function FilterPill({
+  active,
+  label,
+  onPress,
+}: {
+  active: boolean;
+  label: string;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      onPress={onPress}
+      style={[styles.filterPill, active ? styles.filterPillActive : null]}>
+      <Text style={[styles.filterText, active ? styles.filterTextActive : null]}>{label}</Text>
+    </Pressable>
+  );
+}
+
 function AgendaCard({
+  enrolled,
   event,
   index,
+  onToggleEnrollment,
 }: {
+  enrolled: boolean;
   event: CampusEvent;
   index: number;
+  onToggleEnrollment: () => void;
 }) {
   return (
     <Animatable.View
@@ -245,16 +331,31 @@ function AgendaCard({
       <View style={styles.agendaAccent} />
       <View style={styles.agendaContent}>
         <View style={styles.agendaTop}>
-          <Text style={styles.agendaTitle}>{event.name}</Text>
-          <View style={styles.statusPillLight}>
-            <Text style={styles.statusText}>Inscrever-se</Text>
-          </View>
+          <Text numberOfLines={2} style={styles.agendaTitle}>
+            {event.name}
+          </Text>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={enrolled ? 'Cancelar inscrição' : 'Inscrever-se no evento'}
+            onPress={onToggleEnrollment}
+            style={[styles.statusPill, enrolled ? styles.statusPillEnrolled : null]}>
+            <Text style={[styles.statusText, enrolled ? styles.statusTextEnrolled : null]}>
+              {enrolled ? 'Inscrito' : 'Inscrever-se'}
+            </Text>
+          </Pressable>
         </View>
+
         <View style={styles.agendaMeta}>
-          <MaterialIcons name="schedule" size={12} color="#6F7782" />
-          <Text style={styles.agendaMetaText}>{formatTimeRange(event.event_datetime)}</Text>
-          <MaterialIcons name="place" size={12} color="#6F7782" />
-          <Text style={styles.agendaMetaText}>{event.event_location}</Text>
+          <View style={styles.metaItem}>
+            <MaterialIcons name="schedule" size={13} color="#6F7782" />
+            <Text style={styles.agendaMetaText}>{formatCampusTimeRange(event.event_datetime)}</Text>
+          </View>
+          <View style={styles.metaItem}>
+            <MaterialIcons name="place" size={13} color="#6F7782" />
+            <Text numberOfLines={1} style={styles.agendaMetaText}>
+              {event.event_location}
+            </Text>
+          </View>
         </View>
       </View>
     </Animatable.View>
@@ -265,14 +366,20 @@ function startOfMonth(value: Date) {
   return new Date(value.getFullYear(), value.getMonth(), 1);
 }
 
-function getCalendarDays(monthDate: Date) {
-  const firstDay = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
+function getVisibleMonthDays(monthDate: Date) {
   const daysInMonth = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0).getDate();
-  const leadingBlanks = firstDay.getDay();
-  return [
-    ...Array.from<null>({ length: leadingBlanks }).fill(null),
-    ...Array.from({ length: daysInMonth }, (_, index) => index + 1),
-  ];
+  const firstWeekDay = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1).getDay();
+  const totalCalendarCells = Math.ceil((firstWeekDay + daysInMonth) / 7) * 7;
+
+  return Array.from({ length: totalCalendarCells }, (_, index) => {
+    const day = index - firstWeekDay + 1;
+
+    if (day < 1 || day > daysInMonth) {
+      return { key: `empty-${monthDate.getFullYear()}-${monthDate.getMonth()}-${index}`, day: null };
+    }
+
+    return { key: `day-${monthDate.getFullYear()}-${monthDate.getMonth()}-${day}`, day };
+  });
 }
 
 function groupEventsByDay(events: CampusEvent[]) {
@@ -296,7 +403,7 @@ function formatMonthTitle(value: Date) {
     year: 'numeric',
   })
     .format(value)
-    .replace(/^\w/, (letter) => letter.toUpperCase());
+    .replace(/^[\p{L}]/u, (letter) => letter.toUpperCase());
 }
 
 function formatSelectedDayTitle(value: Date) {
@@ -306,11 +413,7 @@ function formatSelectedDayTitle(value: Date) {
     year: 'numeric',
   })
     .format(value)
-    .replace(/^\w/, (letter) => letter.toUpperCase());
-}
-
-function formatTimeRange(value: string) {
-  return formatCampusTimeRange(value);
+    .replace(/^[\p{L}]/u, (letter) => letter.toUpperCase());
 }
 
 function isEventInPast(event: CampusEvent) {
@@ -325,7 +428,10 @@ const styles = StyleSheet.create({
   content: {
     paddingBottom: 112,
     paddingHorizontal: 18,
-    paddingTop: 8,
+    paddingTop: 10,
+  },
+  contentCompact: {
+    paddingHorizontal: 14,
   },
   header: {
     alignItems: 'center',
@@ -334,7 +440,7 @@ const styles = StyleSheet.create({
     minHeight: 44,
   },
   headerSpacer: {
-    width: 20,
+    width: 22,
   },
   headerTitle: {
     color: '#111111',
@@ -345,32 +451,40 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: 24,
+    marginTop: 30,
   },
   monthTitle: {
-    color: '#111111',
-    fontSize: 17,
+    color: '#20242A',
+    fontSize: 18,
     fontWeight: '900',
   },
   monthActions: {
+    alignItems: 'center',
     flexDirection: 'row',
     gap: 10,
   },
+  monthButton: {
+    alignItems: 'center',
+    height: 28,
+    justifyContent: 'center',
+    width: 28,
+  },
   filters: {
     flexDirection: 'row',
-    gap: 8,
+    gap: 10,
     marginTop: 22,
   },
   filterPill: {
     alignItems: 'center',
     backgroundColor: '#FFFFFF',
-    borderRadius: 14,
+    borderRadius: 16,
     height: 28,
     justifyContent: 'center',
-    paddingHorizontal: 13,
+    minWidth: 58,
+    paddingHorizontal: 14,
   },
   filterPillActive: {
-    backgroundColor: '#FFCC00',
+    backgroundColor: PRIMARY_COLOR,
   },
   filterText: {
     color: '#5D6470',
@@ -403,20 +517,23 @@ const styles = StyleSheet.create({
   calendarCard: {
     backgroundColor: '#FFFFFF',
     borderRadius: 10,
-    marginTop: 16,
-    paddingHorizontal: 14,
-    paddingVertical: 14,
+    marginTop: 28,
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    shadowColor: '#111111',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.03,
+    shadowRadius: 14,
   },
   weekRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
   },
   weekDay: {
-    color: '#20242A',
+    color: '#3E444C',
+    flex: 1,
     fontSize: 9,
     fontWeight: '900',
     textAlign: 'center',
-    width: 32,
   },
   daysGrid: {
     flexDirection: 'row',
@@ -426,26 +543,26 @@ const styles = StyleSheet.create({
   },
   dayCell: {
     alignItems: 'center',
-    height: 32,
+    height: 34,
     width: `${100 / 7}%`,
   },
   dayCircle: {
     alignItems: 'center',
-    borderRadius: 15,
-    height: 30,
+    borderRadius: 16,
+    height: 32,
     justifyContent: 'center',
-    width: 30,
+    width: 32,
   },
   dayCircleActive: {
-    backgroundColor: '#FFCC00',
+    backgroundColor: PRIMARY_COLOR,
   },
   dayText: {
     color: '#2F3338',
-    fontSize: 10,
+    fontSize: 12,
     fontWeight: '700',
   },
   dayTextActive: {
-    color: '#111111',
+    color: '#FFFFFF',
     fontWeight: '900',
   },
   eventDot: {
@@ -457,13 +574,13 @@ const styles = StyleSheet.create({
   },
   dayTitle: {
     color: '#2A2E35',
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '900',
     marginTop: 26,
   },
   eventList: {
     gap: 12,
-    marginTop: 12,
+    marginTop: 14,
   },
   emptyText: {
     color: '#7A7F87',
@@ -474,55 +591,72 @@ const styles = StyleSheet.create({
   },
   agendaCard: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 8,
+    borderRadius: 9,
     flexDirection: 'row',
     minHeight: 84,
     overflow: 'hidden',
+    shadowColor: '#111111',
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.03,
+    shadowRadius: 14,
   },
   agendaAccent: {
-    backgroundColor: '#FFCC00',
-    width: 4,
+    backgroundColor: PRIMARY_COLOR,
+    width: 3,
   },
   agendaContent: {
     flex: 1,
     justifyContent: 'center',
-    paddingHorizontal: 14,
+    paddingHorizontal: 16,
     paddingVertical: 12,
   },
   agendaTop: {
-    alignItems: 'center',
+    alignItems: 'flex-start',
     flexDirection: 'row',
-    gap: 8,
+    gap: 10,
     justifyContent: 'space-between',
   },
   agendaTitle: {
     color: '#2F3338',
     flex: 1,
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '900',
+    lineHeight: 19,
   },
-  statusPillLight: {
+  statusPill: {
     backgroundColor: '#ECEEF1',
-    borderRadius: 12,
-    paddingHorizontal: 8,
+    borderRadius: 13,
+    paddingHorizontal: 9,
     paddingVertical: 5,
+  },
+  statusPillEnrolled: {
+    backgroundColor: '#FFF1B7',
   },
   statusText: {
     color: '#333333',
-    fontSize: 8,
+    fontSize: 9,
     fontWeight: '900',
+  },
+  statusTextEnrolled: {
+    color: '#3A3100',
     textTransform: 'uppercase',
   },
   agendaMeta: {
     alignItems: 'center',
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 5,
-    marginTop: 12,
+    gap: 8,
+    marginTop: 10,
+  },
+  metaItem: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 3,
+    maxWidth: '100%',
   },
   agendaMetaText: {
     color: '#5F6670',
-    fontSize: 10,
+    fontSize: 12,
     fontWeight: '700',
   },
 });

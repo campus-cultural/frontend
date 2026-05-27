@@ -39,19 +39,19 @@ export default function TabsLayout() {
         tabBarItemStyle: styles.tabBarItem,
       }}>
       <Tabs.Screen
+        name="index"
+        options={{
+          title: 'Início',
+          tabBarIcon: ({ focused }) => <TabItem focused={focused} icon="home" label="Início" />,
+        }}
+      />
+      <Tabs.Screen
         name="calendario"
         options={{
           title: 'Calendário',
           tabBarIcon: ({ focused }) => (
             <TabItem focused={focused} icon="calendar-today" label="Calendário" />
           ),
-        }}
-      />
-      <Tabs.Screen
-        name="index"
-        options={{
-          title: 'Início',
-          tabBarIcon: ({ focused }) => <TabItem focused={focused} icon="home" label="Início" />,
         }}
       />
       <Tabs.Screen
