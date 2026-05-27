@@ -4,12 +4,12 @@ import React, { useCallback } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { HapticTab } from '@/components/haptic-tab';
-import { clearAuthToken } from '@/src/lib/auth/token';
 import { hasAuthToken } from '@/src/lib/api/campus';
+import { clearAuthToken } from '@/src/lib/auth/token';
 
 const TAB_ICON_SIZE = 20;
 
-export default function TabLayout() {
+export default function TabsLayout() {
   const router = useRouter();
 
   useFocusEffect(
@@ -61,10 +61,7 @@ export default function TabLayout() {
           tabBarIcon: ({ focused }) => <TabItem focused={focused} icon="person" label="Perfil" />,
         }}
       />
-      <Tabs.Screen
-        name="novo-evento"
-        options={{ href: null }}
-      />
+      <Tabs.Screen name="novo-evento" options={{ href: null }} />
     </Tabs>
   );
 }
