@@ -57,16 +57,7 @@ export type UserCreateIn = {
   password: string;
 };
 
-export type UserUpdateIn = {
-  role: UserRole;
-  email: string;
-  name: string;
-  last_name: string;
-  birth_date: string | null;
-  is_active: boolean;
-  ra: string | null;
-  password: string;
-};
+export type UserUpdateIn = Partial<UserCreateIn>;
 
 export type UserLoginIn = {
   email: string;
@@ -317,7 +308,7 @@ async function requestJson<T>(path: string, init?: RequestInit) {
       throw new AuthSessionError();
     }
 
-    if (response.status === 404 && path.startsWith('/events')) {
+    if (__DEV__ && response.status === 404 && path.startsWith('/events')) {
       throw new Error('Use a branch feature/events-table do backend para habilitar /events.');
     }
 

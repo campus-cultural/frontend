@@ -26,6 +26,7 @@ import {
   isAuthSessionError,
   listEvents,
   CampusEvent,
+  updateUser,
   updateProfilePicture,
 } from '@/src/lib/api/campus';
 import { clearAuthToken } from '@/src/lib/auth/token';
@@ -168,12 +169,23 @@ export default function ProfileScreen() {
     setIsSavingProfile(true);
 
     try {
+      let updatedUser = user;
+
+      if (hasUnsavedProfileData) {
+        updatedUser = await updateUser(user.id, {
+          email: user.email.trim(),
+          last_name: user.last_name.trim(),
+          name: user.name.trim(),
+        });
+        setUser(updatedUser);
+      }
+
       if (profileImageUri && profileImageUri !== savedProfileImageUri) {
         await updateProfilePicture(user.id, profileImageUri);
         setSavedProfileImageUri(profileImageUri);
       }
 
-      setSavedUser(user);
+      setSavedUser(updatedUser);
       showToast({ message: 'Perfil salvo com sucesso.', type: 'success' });
     } catch (profileError) {
       if (isAuthSessionError(profileError)) {
@@ -522,13 +534,15 @@ function roleLabel(role: CurrentUser['role']) {
 }
 
 function formatEventTime(value: Date) {
-  const start = new Intl.DateTimeFormat('en-US', {
-    hour: 'numeric',
+  const start = new Intl.DateTimeFormat('pt-BR', {
+    hour: '2-digit',
+    hour12: false,
     minute: '2-digit',
     timeZone: 'UTC',
   }).format(value);
-  const end = new Intl.DateTimeFormat('en-US', {
-    hour: 'numeric',
+  const end = new Intl.DateTimeFormat('pt-BR', {
+    hour: '2-digit',
+    hour12: false,
     minute: '2-digit',
     timeZone: 'UTC',
   }).format(new Date(value.getTime() + 90 * 60 * 1000));

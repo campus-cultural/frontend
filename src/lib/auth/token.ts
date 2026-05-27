@@ -8,7 +8,7 @@ const SECURE_STORE_OPTIONS: SecureStore.SecureStoreOptions = {
 
 function getWebStorage() {
   if (typeof localStorage === 'undefined') {
-    throw new Error('Armazenamento local indisponivel neste ambiente.');
+    throw new Error('Armazenamento local indisponível neste ambiente.');
   }
 
   return localStorage;
@@ -16,7 +16,7 @@ function getWebStorage() {
 
 async function assertSecureStoreAvailable() {
   if (!(await SecureStore.isAvailableAsync())) {
-    throw new Error('Armazenamento seguro indisponivel neste dispositivo.');
+    throw new Error('Armazenamento seguro indisponível neste dispositivo.');
   }
 }
 

@@ -312,8 +312,9 @@ function formatSelectedDayTitle(value: Date) {
 function formatTimeRange(value: string) {
   const date = new Date(value);
   const endDate = new Date(date.getTime() + 90 * 60 * 1000);
-  const formatter = new Intl.DateTimeFormat('en-US', {
-    hour: 'numeric',
+  const formatter = new Intl.DateTimeFormat('pt-BR', {
+    hour: '2-digit',
+    hour12: false,
     minute: '2-digit',
     timeZone: 'UTC',
   });

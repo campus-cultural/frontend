@@ -6,7 +6,7 @@ Este guia define o padrao esperado para contribuicoes no frontend.
 
 - `app/` deve conter apenas rotas do Expo Router e wrappers pequenos.
 - `src/view/screens/` deve conter telas completas.
-- `src/view/com/` deve conter componentes reutilizaveis de interface.
+- `components/` deve conter componentes reutilizaveis de interface.
 - `src/lib/` deve conter API, storage, configuracao e utilitarios sem dependencia visual.
 - Evite criar abstracoes antes de haver repeticao real.
 - Prefira nomes descritivos em ingles para codigo e mensagens em pt-BR para usuario.
@@ -23,7 +23,7 @@ Este guia define o padrao esperado para contribuicoes no frontend.
 
 - Telas devem ser legiveis de cima para baixo: estado, derivacoes, handlers e JSX.
 - Componentes pequenos podem ficar no mesmo arquivo da tela se nao forem reutilizados.
-- Componentes reutilizados em mais de uma tela devem ir para `src/view/com`.
+- Componentes reutilizados em mais de uma tela devem ir para `components/`.
 - Use `accessibilityRole` e `accessibilityLabel` em botoes sem texto claro.
 - Evite textos gigantes dentro de botoes; use labels curtos.
 

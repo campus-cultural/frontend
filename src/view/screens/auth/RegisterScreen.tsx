@@ -57,7 +57,7 @@ export default function RegisterScreen() {
 
   const isStudent = form.role === 'student';
   const birthDateLabel = useMemo(
-    () => (form.birthDate ? formatDisplayDate(form.birthDate) : 'mm/dd/yyyy'),
+    () => (form.birthDate ? formatDisplayDate(form.birthDate) : 'dd/mm/aaaa'),
     [form.birthDate],
   );
 
