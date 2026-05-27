@@ -4,6 +4,7 @@ import { clearAuthToken, getAuthToken, saveAuthToken } from '@/src/lib/auth/toke
 import { env } from '@/src/lib/config/env';
 
 export const API_BASE_URL = env.apiBaseUrl;
+const TOKEN_REFRESH_THRESHOLD_SECONDS = 5 * 60;
 
 export type UserRole = 'student' | 'professor' | 'admin';
 
@@ -86,7 +87,7 @@ export function isAuthSessionError(error: unknown): error is AuthSessionError {
 
 export async function hasAuthToken() {
   try {
-    await getTokenPayload();
+    await getValidAuthToken();
     return true;
   } catch {
     return false;
@@ -107,7 +108,22 @@ export async function login(payload: UserLoginIn) {
 }
 
 export async function refreshToken() {
-  const response = await request<TokenOut>('/users/refresh-token', {
+  const authToken = await getStoredAuthToken();
+
+  try {
+    assertTokenIsValid(authToken);
+  } catch (error) {
+    if (isAuthSessionError(error)) {
+      await clearAuthToken();
+    }
+
+    throw error;
+  }
+
+  const response = await requestJson<TokenOut>('/users/refresh-token', {
+    headers: {
+      Authorization: `Bearer ${authToken}`,
+    },
     method: 'POST',
   });
   await saveAuthToken(response.access_token);
@@ -130,7 +146,7 @@ export async function getUser(userId: number) {
 }
 
 export async function getCurrentUser() {
-  const tokenPayload = await getTokenPayload();
+  const tokenPayload = getTokenPayload(await getValidAuthToken());
   return getUser(Number(tokenPayload.sub));
 }
 
@@ -197,7 +213,7 @@ export async function deleteEvent(eventId: number) {
   });
 }
 
-async function getTokenPayload() {
+async function getStoredAuthToken() {
   const authToken = await getAuthToken();
 
   if (!authToken) {
@@ -205,22 +221,66 @@ async function getTokenPayload() {
     throw new AuthSessionError('Faça login para autenticar com o backend.');
   }
 
-  try {
-    const tokenPayload = jwtDecode<TokenPayload>(authToken);
+  return authToken;
+}
 
-    if (isTokenExpired(tokenPayload)) {
+async function getValidAuthToken() {
+  const authToken = await getStoredAuthToken();
+  let tokenPayload: TokenPayload;
+
+  try {
+    tokenPayload = getTokenPayload(authToken);
+  } catch (error) {
+    if (isAuthSessionError(error)) {
       await clearAuthToken();
-      throw new AuthSessionError();
     }
 
+    throw error;
+  }
+
+  if (isTokenExpired(tokenPayload)) {
+    await clearAuthToken();
+    throw new AuthSessionError();
+  }
+
+  if (shouldRefreshToken(tokenPayload)) {
+    return refreshAuthToken(authToken);
+  }
+
+  return authToken;
+}
+
+async function refreshAuthToken(authToken: string) {
+  assertTokenIsValid(authToken);
+
+  const response = await requestJson<TokenOut>('/users/refresh-token', {
+    headers: {
+      Authorization: `Bearer ${authToken}`,
+    },
+    method: 'POST',
+  });
+  await saveAuthToken(response.access_token);
+  return response.access_token;
+}
+
+function getTokenPayload(authToken: string) {
+  try {
+    const tokenPayload = jwtDecode<TokenPayload>(authToken);
     return tokenPayload;
   } catch (error) {
     if (isAuthSessionError(error)) {
       throw error;
     }
 
-    await clearAuthToken();
     throw new AuthSessionError('Sessão inválida. Faça login novamente.');
+  }
+}
+
+function assertTokenIsValid(authToken: string) {
+  const tokenPayload = getTokenPayload(authToken);
+
+  if (isTokenExpired(tokenPayload)) {
+    throw new AuthSessionError();
   }
 }
 
@@ -233,14 +293,7 @@ function isTokenExpired(tokenPayload: TokenPayload) {
 }
 
 async function request<T>(path: string, init?: RequestInit) {
-  const authToken = await getAuthToken();
-
-  if (!authToken) {
-    await clearAuthToken();
-    throw new AuthSessionError('Faça login para autenticar com o backend.');
-  }
-
-  await getTokenPayload();
+  const authToken = await getValidAuthToken();
 
   return requestJson<T>(path, {
     ...init,
@@ -256,14 +309,7 @@ async function requestPublic<T>(path: string, init?: RequestInit) {
 }
 
 async function requestBlob(path: string, options?: { allowNotFound?: boolean }) {
-  const authToken = await getAuthToken();
-
-  if (!authToken) {
-    await clearAuthToken();
-    throw new AuthSessionError('Faça login para autenticar com o backend.');
-  }
-
-  await getTokenPayload();
+  const authToken = await getValidAuthToken();
 
   const response = await fetch(`${API_BASE_URL}${path}`, {
     headers: {
@@ -386,4 +432,12 @@ function getFallbackErrorMessage(path: string) {
   }
 
   return 'Não foi possível concluir a solicitação. Tente novamente.';
+}
+
+function shouldRefreshToken(tokenPayload: TokenPayload) {
+  if (typeof tokenPayload.exp !== 'number') {
+    return false;
+  }
+
+  return tokenPayload.exp - Math.floor(Date.now() / 1000) <= TOKEN_REFRESH_THRESHOLD_SECONDS;
 }
