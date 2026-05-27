@@ -1,15 +1,93 @@
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { useCallback, useMemo, useState } from 'react';
 import * as Animatable from 'react-native-animatable';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { CampusEvent } from '@/src/lib/api/campus';
-import { mockAgendaEvents } from '@/src/lib/events/mockEvents';
+import { CampusEvent, isAuthSessionError, listEvents } from '@/src/lib/api/campus';
 
 const weekDays = ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'];
-const monthDays = Array.from({ length: 28 }, (_, index) => index + 1);
 
 export default function CalendarScreen() {
+  const router = useRouter();
+  const [events, setEvents] = useState<CampusEvent[]>([]);
+  const [monthDate, setMonthDate] = useState(() => startOfMonth(new Date()));
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const monthDays = useMemo(() => getCalendarDays(monthDate), [monthDate]);
+  const eventsByDay = useMemo(() => groupEventsByDay(events), [events]);
+  const selectedDayEvents = useMemo(
+    () => (selectedDate ? eventsByDay.get(getDateKey(selectedDate)) ?? [] : []),
+    [eventsByDay, selectedDate],
+  );
+
+  useFocusEffect(
+    useCallback(() => {
+      let isMounted = true;
+
+      async function loadEvents() {
+        setIsLoading(true);
+        setError(null);
+
+        try {
+          const apiEvents = await listEvents();
+          const sortedEvents = [...apiEvents].sort(
+            (left, right) =>
+              new Date(left.event_datetime).getTime() - new Date(right.event_datetime).getTime(),
+          );
+          const firstEventDate = sortedEvents[0]
+            ? new Date(sortedEvents[0].event_datetime)
+            : new Date();
+
+          if (!isMounted) {
+            return;
+          }
+
+          setEvents(sortedEvents);
+          setMonthDate(startOfMonth(firstEventDate));
+          setSelectedDate(firstEventDate);
+        } catch (calendarError) {
+          if (isAuthSessionError(calendarError)) {
+            router.replace('/login' as never);
+            return;
+          }
+
+          if (isMounted) {
+            setEvents([]);
+            setError(
+              calendarError instanceof Error
+                ? calendarError.message
+                : 'Não foi possível carregar a agenda.',
+            );
+          }
+        } finally {
+          if (isMounted) {
+            setIsLoading(false);
+          }
+        }
+      }
+
+      void loadEvents();
+
+      return () => {
+        isMounted = false;
+      };
+    }, [router]),
+  );
+
+  function goToPreviousMonth() {
+    setMonthDate((current) => startOfMonth(new Date(current.getFullYear(), current.getMonth() - 1, 1)));
+    setSelectedDate(null);
+  }
+
+  function goToNextMonth() {
+    setMonthDate((current) => startOfMonth(new Date(current.getFullYear(), current.getMonth() + 1, 1)));
+    setSelectedDate(null);
+  }
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
@@ -29,10 +107,22 @@ export default function CalendarScreen() {
           duration={360}
           style={styles.monthRow}
           useNativeDriver>
-          <Text style={styles.monthTitle}>Abril 2026</Text>
+          <Text style={styles.monthTitle}>{formatMonthTitle(monthDate)}</Text>
           <View style={styles.monthActions}>
-            <MaterialIcons name="chevron-left" size={18} color="#69707A" />
-            <MaterialIcons name="chevron-right" size={18} color="#69707A" />
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Mês anterior"
+              hitSlop={10}
+              onPress={goToPreviousMonth}>
+              <MaterialIcons name="chevron-left" size={18} color="#69707A" />
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Próximo mês"
+              hitSlop={10}
+              onPress={goToNextMonth}>
+              <MaterialIcons name="chevron-right" size={18} color="#69707A" />
+            </Pressable>
           </View>
         </Animatable.View>
 
@@ -50,6 +140,23 @@ export default function CalendarScreen() {
           </View>
         </Animatable.View>
 
+        {isLoading ? (
+          <Animatable.View
+            animation="pulse"
+            iterationCount="infinite"
+            style={styles.loadingRow}
+            useNativeDriver>
+            <ActivityIndicator color="#111111" />
+            <Text style={styles.loadingText}>Atualizando agenda...</Text>
+          </Animatable.View>
+        ) : null}
+
+        {error ? (
+          <Animatable.Text animation="fadeIn" duration={320} style={styles.errorText} useNativeDriver>
+            {error}
+          </Animatable.Text>
+        ) : null}
+
         <Animatable.View
           animation="fadeInUp"
           delay={180}
@@ -64,17 +171,27 @@ export default function CalendarScreen() {
             ))}
           </View>
           <View style={styles.daysGrid}>
-            {monthDays.map((day) => {
-              const isSelected = day === 13;
-              const hasEvent = [9, 13, 20].includes(day);
+            {monthDays.map((day, index) => {
+              if (!day) {
+                return <View key={`blank-${index}`} style={styles.dayCell} />;
+              }
+
+              const dayDate = new Date(monthDate.getFullYear(), monthDate.getMonth(), day);
+              const dateKey = getDateKey(dayDate);
+              const isSelected = selectedDate ? getDateKey(selectedDate) === dateKey : false;
+              const hasEvent = eventsByDay.has(dateKey);
 
               return (
                 <View key={day} style={styles.dayCell}>
-                  <View style={[styles.dayCircle, isSelected ? styles.dayCircleActive : null]}>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={`Selecionar dia ${day}`}
+                    onPress={() => setSelectedDate(dayDate)}
+                    style={[styles.dayCircle, isSelected ? styles.dayCircleActive : null]}>
                     <Text style={[styles.dayText, isSelected ? styles.dayTextActive : null]}>
                       {day}
                     </Text>
-                  </View>
+                  </Pressable>
                   {hasEvent && !isSelected ? <View style={styles.eventDot} /> : null}
                 </View>
               );
@@ -88,13 +205,23 @@ export default function CalendarScreen() {
           duration={360}
           style={styles.dayTitle}
           useNativeDriver>
-          13 de Abril de 2026
+          {selectedDate ? formatSelectedDayTitle(selectedDate) : 'Selecione um dia'}
         </Animatable.Text>
 
         <View style={styles.eventList}>
-          {mockAgendaEvents.map((event, index) => (
-            <AgendaCard event={event} index={index} isSubscribed={index === 0} key={event.id} />
+          {selectedDayEvents.map((event, index) => (
+            <AgendaCard event={event} index={index} key={event.id} />
           ))}
+
+          {!isLoading && selectedDate && selectedDayEvents.length === 0 ? (
+            <Animatable.Text
+              animation="fadeIn"
+              duration={320}
+              style={styles.emptyText}
+              useNativeDriver>
+              Nenhum evento para este dia.
+            </Animatable.Text>
+          ) : null}
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -104,11 +231,9 @@ export default function CalendarScreen() {
 function AgendaCard({
   event,
   index,
-  isSubscribed,
 }: {
   event: CampusEvent;
   index: number;
-  isSubscribed: boolean;
 }) {
   return (
     <Animatable.View
@@ -121,8 +246,8 @@ function AgendaCard({
       <View style={styles.agendaContent}>
         <View style={styles.agendaTop}>
           <Text style={styles.agendaTitle}>{event.name}</Text>
-          <View style={[styles.statusPill, !isSubscribed ? styles.statusPillLight : null]}>
-            <Text style={styles.statusText}>{isSubscribed ? 'Inscrito' : 'Inscrever-se'}</Text>
+          <View style={styles.statusPillLight}>
+            <Text style={styles.statusText}>Inscrever-se</Text>
           </View>
         </View>
         <View style={styles.agendaMeta}>
@@ -134,6 +259,54 @@ function AgendaCard({
       </View>
     </Animatable.View>
   );
+}
+
+function startOfMonth(value: Date) {
+  return new Date(value.getFullYear(), value.getMonth(), 1);
+}
+
+function getCalendarDays(monthDate: Date) {
+  const firstDay = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
+  const daysInMonth = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0).getDate();
+  const leadingBlanks = firstDay.getDay();
+  return [
+    ...Array.from<null>({ length: leadingBlanks }).fill(null),
+    ...Array.from({ length: daysInMonth }, (_, index) => index + 1),
+  ];
+}
+
+function groupEventsByDay(events: CampusEvent[]) {
+  return events.reduce((groupedEvents, event) => {
+    const dateKey = getDateKey(new Date(event.event_datetime));
+    const currentEvents = groupedEvents.get(dateKey) ?? [];
+    groupedEvents.set(dateKey, [...currentEvents, event]);
+    return groupedEvents;
+  }, new Map<string, CampusEvent[]>());
+}
+
+function getDateKey(value: Date) {
+  return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}-${String(
+    value.getDate(),
+  ).padStart(2, '0')}`;
+}
+
+function formatMonthTitle(value: Date) {
+  return new Intl.DateTimeFormat('pt-BR', {
+    month: 'long',
+    year: 'numeric',
+  })
+    .format(value)
+    .replace(/^\w/, (letter) => letter.toUpperCase());
+}
+
+function formatSelectedDayTitle(value: Date) {
+  return new Intl.DateTimeFormat('pt-BR', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  })
+    .format(value)
+    .replace(/^\w/, (letter) => letter.toUpperCase());
 }
 
 function formatTimeRange(value: string) {
@@ -211,6 +384,26 @@ const styles = StyleSheet.create({
   filterTextActive: {
     color: '#111111',
   },
+  loadingRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 8,
+    justifyContent: 'center',
+    marginTop: 16,
+  },
+  loadingText: {
+    color: '#6B7280',
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  errorText: {
+    color: '#B42318',
+    fontSize: 12,
+    fontWeight: '800',
+    lineHeight: 18,
+    marginTop: 16,
+    textAlign: 'center',
+  },
   calendarCard: {
     backgroundColor: '#FFFFFF',
     borderRadius: 10,
@@ -276,6 +469,13 @@ const styles = StyleSheet.create({
     gap: 12,
     marginTop: 12,
   },
+  emptyText: {
+    color: '#7A7F87',
+    fontSize: 12,
+    fontWeight: '800',
+    paddingTop: 12,
+    textAlign: 'center',
+  },
   agendaCard: {
     backgroundColor: '#FFFFFF',
     borderRadius: 8,
@@ -305,14 +505,11 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '900',
   },
-  statusPill: {
-    backgroundColor: '#FFCC00',
+  statusPillLight: {
+    backgroundColor: '#ECEEF1',
     borderRadius: 12,
     paddingHorizontal: 8,
     paddingVertical: 5,
-  },
-  statusPillLight: {
-    backgroundColor: '#ECEEF1',
   },
   statusText: {
     color: '#333333',
