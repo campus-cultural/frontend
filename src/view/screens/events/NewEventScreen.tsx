@@ -16,7 +16,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import DatePicker, { DateType, useDefaultStyles } from 'react-native-ui-datepicker';
+import { DateType } from 'react-native-ui-datepicker';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppToast } from '@/components/ui/app-toast';
@@ -31,6 +31,7 @@ import {
   updateEvent,
 } from '@/src/lib/api/campus';
 import { clearAuthToken } from '@/src/lib/auth/token';
+import { CampusDatePicker } from '@/components/ui/campus-date-picker';
 import {
   CAMPUS_TIME_ZONE,
   formatCampusDateTimeLabel,
@@ -77,7 +78,6 @@ const requiredFields: (keyof Pick<EventForm, 'name' | 'dateTime' | 'place' | 'de
 export default function NewEventScreen() {
   const router = useRouter();
   const { eventId } = useLocalSearchParams<{ eventId?: string }>();
-  const datePickerStyles = useDefaultStyles();
   const editingEventId = eventId ? Number(eventId) : null;
   const [form, setForm] = useState<EventForm>(initialForm);
   const [savedForm, setSavedForm] = useState<EventForm>(initialForm);
@@ -618,22 +618,17 @@ export default function NewEventScreen() {
                 <MaterialIcons name="close" size={22} color="#5F6670" />
               </Pressable>
             </View>
-            <DatePicker
-              mode="single"
+            <CampusDatePicker
               date={draftDate}
+              endYear={new Date().getFullYear() + 5}
               firstDayOfWeek={0}
               locale="pt-br"
               minDate={minimumSelectableDate}
-              onChange={({ date }) => handlePickerChange(date)}
+              onChange={(params) => handlePickerChange(params.date)}
+              startYear={new Date().getFullYear()}
               timePicker
               timeZone={CAMPUS_TIME_ZONE}
               use12Hours={false}
-              styles={{
-                ...datePickerStyles,
-                selected: styles.datePickerSelected,
-                selected_label: styles.datePickerSelectedLabel,
-                today: styles.datePickerToday,
-              }}
             />
             <View style={styles.popoverActions}>
               <Pressable
@@ -911,18 +906,6 @@ const styles = StyleSheet.create({
     color: '#20242A',
     fontSize: 17,
     fontWeight: '900',
-  },
-  datePickerSelected: {
-    backgroundColor: '#FFCC00',
-    borderColor: '#FFCC00',
-  },
-  datePickerSelectedLabel: {
-    color: '#111111',
-    fontWeight: '900',
-  },
-  datePickerToday: {
-    borderColor: '#FFCC00',
-    borderWidth: 1,
   },
   popoverActions: {
     flexDirection: 'row',

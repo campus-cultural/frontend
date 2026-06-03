@@ -14,11 +14,12 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import DatePicker, { DateType, useDefaultStyles } from 'react-native-ui-datepicker';
+import { DateType } from 'react-native-ui-datepicker';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppToast } from '@/components/ui/app-toast';
 import { login, registerUser, UserRole } from '@/src/lib/api/campus';
+import { CampusDatePicker } from '@/components/ui/campus-date-picker';
 import { useAppToast } from '@/src/view/hooks/useAppToast';
 
 type RegisterRole = Exclude<UserRole, 'admin'>;
@@ -50,7 +51,6 @@ const initialForm: RegisterForm = {
 export default function RegisterScreen() {
   const router = useRouter();
   const navigationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const datePickerStyles = useDefaultStyles();
   const [form, setForm] = useState<RegisterForm>(initialForm);
   const [errors, setErrors] = useState<RegisterErrors>({});
   const [draftBirthDate, setDraftBirthDate] = useState<Date>(new Date(2000, 0, 1));
@@ -376,19 +376,14 @@ export default function RegisterScreen() {
                 <MaterialIcons name="close" size={22} color="#5F6670" />
               </Pressable>
             </View>
-            <DatePicker
-              mode="single"
+            <CampusDatePicker
               date={draftBirthDate}
+              endYear={new Date().getFullYear()}
               firstDayOfWeek={0}
               locale="pt-br"
               maxDate={new Date()}
-              onChange={({ date }) => handleBirthPickerChange(date)}
-              styles={{
-                ...datePickerStyles,
-                selected: styles.datePickerSelected,
-                selected_label: styles.datePickerSelectedLabel,
-                today: styles.datePickerToday,
-              }}
+              onChange={(params) => handleBirthPickerChange(params.date)}
+              startYear={1940}
             />
             <View style={styles.popoverActions}>
               <Pressable
@@ -697,18 +692,6 @@ const styles = StyleSheet.create({
     color: '#20242A',
     fontSize: 17,
     fontWeight: '900',
-  },
-  datePickerSelected: {
-    backgroundColor: '#FFCC00',
-    borderColor: '#FFCC00',
-  },
-  datePickerSelectedLabel: {
-    color: '#111111',
-    fontWeight: '900',
-  },
-  datePickerToday: {
-    borderColor: '#FFCC00',
-    borderWidth: 1,
   },
   popoverActions: {
     flexDirection: 'row',

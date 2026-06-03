@@ -1,287 +1,208 @@
-# Campus Cultural UTFPR - Frontend
+# Campus Cultural UTFPR — Frontend
 
-Aplicativo mobile em Expo/React Native para autenticação, perfil e cadastro de eventos culturais da UTFPR.
+App Expo/React Native para login, cadastro, perfil e eventos culturais da UTFPR.
 
-## Stack
+| Plataforma | Uso recomendado |
+|------------|-----------------|
+| **Android / iOS** | Principal (emulador, dispositivo, EAS) |
+| **Web** | Dev e smoke test; alguns fluxos diferem do mobile (câmera, token) |
 
-- Expo SDK 54
-- React Native 0.81
-- Expo Router
-- TypeScript
-- EAS Build para builds Android/iOS
-
-## Requisitos
-
-- Git
-- Node.js LTS
-- npm
-- Android Studio, para emulador/build Android local
-- Xcode, apenas para iOS em macOS
-- Backend do projeto rodando em `http://127.0.0.1:8000` ou URL configurada em `.env`
-
-Referências oficiais:
-
-- [Expo Environment Variables](https://docs.expo.dev/guides/environment-variables/)
-- [Expo Android APK Builds](https://docs.expo.dev/build-reference/apk/)
-- [Expo Production Builds](https://docs.expo.dev/deploy/build-project/)
-- [React Native Android Environment](https://reactnative.dev/docs/set-up-your-environment)
-
-## Primeira Instalação
+## Começar em 3 passos
 
 ```bash
 git clone https://github.com/campus-cultural/frontend.git
 cd frontend
-git checkout develop
 npm install
 cp .env.example .env
+npm start
 ```
 
-Configure a API em `.env`:
+No `.env`, aponte para a API que você vai usar (veja [Configurar a API](#configurar-a-api)).
+
+Depois: `a` (Android), `i` (iOS) ou `w` (web).
+
+## Configurar a API
+
+Toda chamada HTTP usa `EXPO_PUBLIC_API_URL` (sem barra no final). A variável é embutida no bundle — **não** coloque segredos aqui.
+
+### API no Render (recomendado para testar sem backend local)
+
+```bash
+EXPO_PUBLIC_API_URL=https://backend-i1n3.onrender.com
+```
+
+| Onde roda | Funciona? | Observação |
+|-----------|-----------|------------|
+| **Android / iOS** (Expo Go ou build) | Sim | Basta o `.env` acima e `npm run start:clear` se já estava com outra URL |
+| **Web** (`npm run web`) | Sim* | O backend precisa liberar CORS para `http://localhost:8081` (já previsto no repositório do backend; confirme deploy no Render) |
+
+Teste rápido da API:
+
+```bash
+curl https://backend-i1n3.onrender.com/health
+# esperado: {"status":"ok"}
+```
+
+**Render (plano free):** o serviço pode “dormir”. A primeira requisição após idle pode levar ~30–60 s; login/cadastro podem parecer lentos uma vez, depois normalizam.
+
+### Backend na sua máquina
+
+Com o [backend](../backend) em `http://127.0.0.1:8000`:
 
 ```bash
 EXPO_PUBLIC_API_URL=http://127.0.0.1:8000
 ```
 
-No Android Emulator, se o backend estiver na sua máquina:
+| Ambiente | URL no `.env` |
+|----------|----------------|
+| iOS Simulator ou web no mesmo Mac | `http://127.0.0.1:8000` |
+| Android Emulator (API no host) | `http://10.0.2.2:8000` |
+| Celular físico (mesma Wi‑Fi) | `http://<IP-do-PC>:8000` |
 
-```bash
-EXPO_PUBLIC_API_URL=http://10.0.2.2:8000
-```
+Após mudar o `.env`, reinicie o Metro (`Ctrl+C` e `npm start`) ou use `npm run start:clear`.
 
-Variáveis `EXPO_PUBLIC_*` entram no bundle do app. Não coloque tokens privados, senhas, chaves de assinatura ou segredos no frontend.
+## Stack
 
-## Rodar em Desenvolvimento
+- Expo SDK 54 · React Native 0.81 · Expo Router · TypeScript
+- EAS Build (Android/iOS)
+- Cliente HTTP: `fetch` em `src/lib/api/campus.ts` → `{EXPO_PUBLIC_API_URL}/users/...`, `/events/...`, `/health`
+
+## Comandos
+
+| Comando | Descrição |
+|---------|-----------|
+| `npm start` | Dev server (menu Expo) |
+| `npm run android` / `ios` / `web` | Abre direto na plataforma |
+| `npm run start:clear` | Dev com cache limpo (use após trocar `.env`) |
+| `npm run check` | Typecheck + ESLint |
+| `npm run export:web` | Build estático em `dist/` |
+| `npm run run:android` | App nativo debug (gera `android/` se precisar) |
+| `npm run build:android:preview` | APK via EAS (nuvem) |
+| `npm run build:android:production` | AAB produção (EAS) |
+
+## Desenvolvimento
 
 ```bash
 npm start
 ```
 
-Atalhos úteis no terminal do Expo:
+- `a` — Android Emulator  
+- `i` — iOS Simulator  
+- `w` — navegador (`http://localhost:8081`)
 
-- `a`: abre Android Emulator
-- `i`: abre iOS Simulator no macOS
-- `w`: abre web
+### Web
 
-Também há scripts diretos:
+- UI em **tema claro** (evita contraste ruim no calendário em modais brancos).
+- Token em `localStorage` (menos seguro que `expo-secure-store` no mobile).
+- Layout pensado para ~390–430px de largura (modo responsivo do navegador).
 
-```bash
-npm run android
-npm run ios
-npm run web
-npm run start:clear
-```
+## Build e deploy
 
-Esses scripts abrem o app em modo de desenvolvimento. Para compilar um binário nativo localmente, use os scripts `run:*` ou `build:*`.
-
-## Android Studio - Windows
-
-1. Instale o Android Studio pelo site oficial: https://developer.android.com/studio
-2. Abra o Android Studio e instale:
-   - Android SDK Platform
-   - Android SDK Platform-Tools
-   - Android Emulator
-   - Android SDK Build-Tools
-3. Abra `Settings > Languages & Frameworks > Android SDK`.
-4. Confirme o caminho do SDK. Normalmente:
-
-```text
-C:\Users\SEU_USUARIO\AppData\Local\Android\Sdk
-```
-
-5. Configure as variáveis de ambiente do Windows:
-
-```text
-ANDROID_HOME=C:\Users\SEU_USUARIO\AppData\Local\Android\Sdk
-```
-
-Adicione ao `Path`:
-
-```text
-%ANDROID_HOME%\platform-tools
-%ANDROID_HOME%\emulator
-%ANDROID_HOME%\cmdline-tools\latest\bin
-```
-
-6. Feche e abra o terminal novamente.
-7. Teste:
+### Web estático
 
 ```bash
-adb version
-emulator -list-avds
+npm run export:web
+npx serve dist   # opcional: testar localmente
 ```
 
-## Android Studio - macOS
+No deploy, defina `EXPO_PUBLIC_API_URL` para a API pública e adicione a URL do site em `CORS_ORIGINS` no backend.
 
-1. Instale o Android Studio pelo site oficial: https://developer.android.com/studio
-2. Abra `Settings > Languages & Frameworks > Android SDK`.
-3. Instale SDK Platform, Platform-Tools, Emulator e Build-Tools.
-4. Configure no `~/.zshrc`:
+### Android
+
+| Objetivo | Comando |
+|----------|---------|
+| Debug local | `npm run run:android` |
+| Regenerar nativo | `npm run prebuild:clean -- --platform android` |
+| APK testes (EAS) | `npm run build:android:preview` |
+| Play Store (EAS) | `npm run build:android:production` |
+
+Perfis em `eas.json`. Evite commitar `android/`/`ios/` sem alinhar com o time.
+
+### iOS
+
+```bash
+npm run run:ios
+```
+
+Distribuição via EAS conforme perfis do projeto.
+
+## Checks antes de PR
+
+```bash
+npm run check && npm run export:web
+```
+
+## Estrutura
+
+```text
+app/                  rotas (Expo Router)
+src/lib/api/          cliente da API
+src/lib/config/env.ts leitura de EXPO_PUBLIC_API_URL
+src/view/screens/     telas
+components/           UI compartilhada
+docs/CODE_STYLE.md    convenções
+```
+
+## Contribuição
+
+1. `git checkout develop && git pull`
+2. Branch descritiva → código seguindo `docs/CODE_STYLE.md`
+3. `npm run check && npm run export:web`
+4. Commit (Conventional Commits + gitmoji) → PR para `develop`
+
+## Problemas comuns
+
+### “Network request failed” / API não responde
+
+1. `curl $EXPO_PUBLIC_API_URL/health` — deve retornar `{"status":"ok"}`  
+2. URL sem barra final; reinicie com `npm run start:clear`  
+3. Render dormindo: espere e tente de novo  
+4. Android + backend local: use `10.0.2.2`, não `127.0.0.1`
+
+### Web: erro de CORS no console
+
+O navegador exige `Access-Control-Allow-Origin` no backend. Localmente o backend já envia CORS para `localhost:8081`. No Render, configure `CORS_ORIGINS` incluindo a origem do Expo web e a URL do front em produção.
+
+### Calendário com datas pouco visíveis
+
+Tema claro forçado no web; se persistir, `npm run start:clear` e recarregue a aba.
+
+### `adb` / emulador
+
+Configure `ANDROID_HOME` (ver [Android Studio](#android-studio-macos) abaixo).
+
+## Android Studio (macOS)
 
 ```bash
 export ANDROID_HOME="$HOME/Library/Android/sdk"
-export PATH="$PATH:$ANDROID_HOME/emulator"
-export PATH="$PATH:$ANDROID_HOME/platform-tools"
-export PATH="$PATH:$ANDROID_HOME/cmdline-tools/latest/bin"
+export PATH="$PATH:$ANDROID_HOME/emulator:$ANDROID_HOME/platform-tools"
 ```
 
-5. Recarregue o shell:
+`source ~/.zshrc` → `adb version` → Device Manager → criar AVD → `npm run android`
 
-```bash
-source ~/.zshrc
-adb version
-emulator -list-avds
-```
+<details>
+<summary>Windows e Linux</summary>
 
-## Android Studio - Linux
+**Windows:** SDK em `%LOCALAPPDATA%\Android\Sdk`, variável `ANDROID_HOME`, Path com `platform-tools` e `emulator`.
 
-1. Instale o Android Studio pelo site oficial: https://developer.android.com/studio
-2. Abra `Settings > Languages & Frameworks > Android SDK`.
-3. Instale SDK Platform, Platform-Tools, Emulator e Build-Tools.
-4. Configure no `~/.bashrc` ou `~/.zshrc`:
+**Linux:** `ANDROID_HOME=$HOME/Android/Sdk` e os mesmos paths no `PATH`. Pode precisar de KVM para o emulador.
 
-```bash
-export ANDROID_HOME="$HOME/Android/Sdk"
-export PATH="$PATH:$ANDROID_HOME/emulator"
-export PATH="$PATH:$ANDROID_HOME/platform-tools"
-export PATH="$PATH:$ANDROID_HOME/cmdline-tools/latest/bin"
-```
+</details>
 
-5. Recarregue o shell:
-
-```bash
-source ~/.bashrc
-adb version
-emulator -list-avds
-```
-
-Em algumas distribuições Linux, pode ser necessário configurar KVM para acelerar o emulador.
-
-## Criar Emulador Android
-
-1. Android Studio > `Device Manager`.
-2. `Create Virtual Device`.
-3. Escolha um Pixel recente.
-4. Baixe uma imagem Android estável.
-5. Inicie o emulador.
-6. Rode:
-
-```bash
-npm run android
-```
-
-## Checks Antes de Enviar PR
-
-```bash
-npm run typecheck
-npm run lint
-npm run export:web
-```
-
-Ou:
-
-```bash
-npm run check
-```
-
-## Build Web
-
-```bash
-npm run export:web
-```
-
-O resultado sai em `dist/`.
-
-## Identidade Nativa do App
-
-O `ios.bundleIdentifier` e o `android.package`, em `app.json`, são os identificadores nativos únicos do aplicativo. Eles seguem formato de domínio reverso e devem representar o projeto, não a máquina ou pessoa que fez o build.
-
-Neste projeto:
+## Identidade nativa (`app.json`)
 
 ```text
 br.edu.utfpr.campuscultural
 ```
 
-No iOS, esse valor precisa existir/ser registrado na conta Apple Developer apenas para assinatura, distribuição e App Store. Para simulador local, ele serve como identificador do app instalado. No Android, `android.package` vira o application id usado pelo sistema, pelo emulador e pela Play Store.
-
-Permissões nativas também saem do `app.json`. Se alguma biblioteca adicionar uma permissão que o app não usa, bloqueie em `android.blockedPermissions` para evitar permissões desnecessárias no APK/AAB.
-
-## Build Local Android
-
-Para compilar e instalar uma build de debug no emulador/dispositivo:
-
-```bash
-npm run run:android
-```
-
-O Expo CLI gera `android/` automaticamente na primeira execução se a pasta ainda não existir.
-
-Para regenerar o projeto nativo do zero quando `app.json` mudar:
-
-```bash
-npm run prebuild:clean -- --platform android
-```
-
-Para gerar APK interno com EAS local:
-
-```bash
-npm run build:android:preview:local
-```
-
-O EAS local exige Android SDK/NDK configurado na máquina. No Windows, a Expo recomenda usar WSL para EAS local; para desenvolvimento diário no Windows, prefira `npm run run:android` ou abra o projeto gerado no Android Studio.
-
-Evite commitar as pastas nativas geradas (`android/`, `ios/`) sem alinhamento com o time.
-
-## Estrutura do Projeto
-
-```text
-app/                  rotas do Expo Router, finas e sem regra de negócio
-src/lib/              integrações, configuração e serviços de baixo nível
-src/view/screens/     telas completas por domínio
-components/           componentes herdados do template/base
-assets/               imagens, fontes e arquivos estáticos
-docs/                 guias internos do projeto
-```
-
-O arquivo `assets/logoUTF.png` é usado na tela de login. Substitua esse arquivo pelo logo oficial mantendo o mesmo nome.
-
-## Fluxo de Contribuição
-
-1. Atualize a branch base:
-
-```bash
-git checkout develop
-git pull
-```
-
-2. Crie uma branch de trabalho com nome descritivo, conforme combinado pelo time.
-
-3. Implemente a mudança seguindo `docs/CODE_STYLE.md`.
-4. Rode os checks:
-
-```bash
-npm run check
-npm run export:web
-```
-
-5. Faça commit com Conventional Commits e gitmoji:
-
-```bash
-git commit -m "feat: ✨ adiciona tela de exemplo"
-```
-
-6. Publique:
-
-```bash
-git push -u origin HEAD
-```
-
-7. Abra PR para `develop`.
-
 ## Segurança
 
-- Não commitar `.env`, keystores, certificados ou tokens.
-- Não colocar segredos em `EXPO_PUBLIC_*`; eles ficam visíveis no bundle.
-- Token de sessão fica no `expo-secure-store` em mobile.
-- No web, o fallback usa armazenamento do navegador e deve ser tratado como menos seguro.
-- Builds de produção usam bundle minificado; `metro.config.js` remove `console.*` e aplica mangling/minificação.
-- Regras sensíveis devem ficar no backend. O frontend só valida para UX.
+- Não commitar `.env`, keystores ou tokens.
+- Autorização real no **backend**; o app só valida para UX.
+- Mobile: `expo-secure-store` · Web: `localStorage`.
+
+## Referências
+
+- [Expo — variáveis de ambiente](https://docs.expo.dev/guides/environment-variables/)
+- [EAS Build](https://docs.expo.dev/build/introduction/)
+- [Expo — export web](https://docs.expo.dev/router/reference/static-rendering/)

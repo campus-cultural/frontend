@@ -1,21 +1,7 @@
-import { useEffect, useState } from 'react';
-import { useColorScheme as useRNColorScheme } from 'react-native';
-
 /**
- * To support static rendering, this value needs to be re-calculated on the client side for web
+ * The UI is designed for light mode only. On web, following the OS dark theme
+ * breaks contrast (for example, date picker labels on white modals).
  */
 export function useColorScheme() {
-  const [hasHydrated, setHasHydrated] = useState(false);
-
-  useEffect(() => {
-    setHasHydrated(true);
-  }, []);
-
-  const colorScheme = useRNColorScheme();
-
-  if (hasHydrated) {
-    return colorScheme;
-  }
-
   return 'light';
 }
