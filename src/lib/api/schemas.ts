@@ -24,6 +24,13 @@ export const campusEventSchema = z.object({
   user_id: z.number().optional(),
 });
 
+export const subscriptionOutSchema = z.object({
+  created_at: z.string(),
+  event_id: z.number(),
+  id: z.number(),
+  user_id: z.number(),
+});
+
 export const healthOutSchema = z.object({
   status: z.literal('ok'),
 });
@@ -46,6 +53,8 @@ export type CampusUser = z.infer<typeof campusUserSchema>;
 export type CurrentUser = CampusUser;
 
 export type CampusEvent = z.infer<typeof campusEventSchema>;
+
+export type SubscriptionOut = z.infer<typeof subscriptionOutSchema>;
 
 export type TokenPayload = z.infer<typeof tokenPayloadSchema>;
 

@@ -3,6 +3,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -19,6 +20,8 @@ import {
   isAuthSessionError,
   listEvents,
   listSubscribedEvents,
+  subscribeToEvent,
+  unsubscribeFromEvent,
 } from '@/src/lib/api/campus';
 import { formatCampusTimeRange, getCampusDateKey } from '@/src/lib/datetime/campusTime';
 
@@ -34,7 +37,6 @@ export default function CalendarScreen() {
   const [filter, setFilter] = useState<EventFilter>('all');
   const [monthDate, setMonthDate] = useState(() => startOfMonth(new Date()));
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
-  const [filter, setFilter] = useState<AgendaFilter>('all');
   const [enrolledEventIds, setEnrolledEventIds] = useState<Set<number>>(new Set());
   const [isLoading, setIsLoading] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -67,21 +69,20 @@ export default function CalendarScreen() {
       }
       setError(null);
 
-        try {
-          const apiEvents =
-            filter === 'subscribed' ? await listSubscribedEvents() : await listEvents();
-          const sortedEvents = [...apiEvents].sort(
-            (left, right) =>
-              new Date(left.event_datetime).getTime() - new Date(right.event_datetime).getTime(),
-          );
-          const initialEvent = sortedEvents.find((event) => !isEventInPast(event));
-          const initialDate = initialEvent ? new Date(initialEvent.event_datetime) : new Date();
-
-          if (!isMounted) {
-            return;
-          }
+      try {
+        const [apiEvents, subscribedEvents] = await Promise.all([
+          listEvents(),
+          listSubscribedEvents(),
+        ]);
+        const sortedEvents = [...apiEvents].sort(
+          (left, right) =>
+            new Date(left.event_datetime).getTime() - new Date(right.event_datetime).getTime(),
+        );
+        const initialEvent = sortedEvents.find((event) => !isEventInPast(event));
+        const initialDate = initialEvent ? new Date(initialEvent.event_datetime) : new Date();
 
         setEvents(sortedEvents);
+        setEnrolledEventIds(new Set(subscribedEvents.map((event) => event.id)));
         setMonthDate(startOfMonth(initialDate));
         setSelectedDate((currentSelectedDate) => currentSelectedDate ?? initialDate);
       } catch (calendarError) {
@@ -107,11 +108,7 @@ export default function CalendarScreen() {
   useFocusEffect(
     useCallback(() => {
       void loadEvents();
-
-      return () => {
-        isMounted = false;
-      };
-    }, [filter, router]),
+    }, [loadEvents]),
   );
 
   function goToPreviousMonth() {
@@ -124,19 +121,36 @@ export default function CalendarScreen() {
     setSelectedDate(null);
   }
 
-  function toggleEnrollment(eventId: number) {
-    setEnrolledEventIds((current) => {
-      const next = new Set(current);
+  const toggleEnrollment = useCallback(
+    async (eventId: number) => {
+      const wasEnrolled = enrolledEventIds.has(eventId);
 
-      if (next.has(eventId)) {
-        next.delete(eventId);
-      } else {
-        next.add(eventId);
+      setEnrolledEventIds((current) => toggleId(current, eventId, !wasEnrolled));
+
+      try {
+        if (wasEnrolled) {
+          await unsubscribeFromEvent(eventId);
+        } else {
+          await subscribeToEvent(eventId);
+        }
+      } catch (enrollError) {
+        if (isAuthSessionError(enrollError)) {
+          router.replace('/login' as never);
+          return;
+        }
+
+        // Rollback the optimistic change on failure.
+        setEnrolledEventIds((current) => toggleId(current, eventId, wasEnrolled));
+        Alert.alert(
+          'Ops',
+          enrollError instanceof Error
+            ? enrollError.message
+            : 'Não foi possível atualizar sua inscrição.',
+        );
       }
-
-      return next;
-    });
-  }
+    },
+    [enrolledEventIds, router],
+  );
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -296,7 +310,7 @@ export default function CalendarScreen() {
               event={event}
               index={index}
               key={event.id}
-              onToggleEnrollment={() => toggleEnrollment(event.id)}
+              onToggleEnrollment={() => void toggleEnrollment(event.id)}
             />
           ))}
 
@@ -306,7 +320,7 @@ export default function CalendarScreen() {
               duration={320}
               style={styles.emptyText}
               useNativeDriver>
-              {filter === 'enrolled'
+              {filter === 'subscribed'
                 ? 'Nenhum evento inscrito para este dia.'
                 : 'Nenhum evento para este dia.'}
             </Animatable.Text>
@@ -314,25 +328,6 @@ export default function CalendarScreen() {
         </View>
       </ScrollView>
     </SafeAreaView>
-  );
-}
-
-function FilterPill({
-  active,
-  label,
-  onPress,
-}: {
-  active: boolean;
-  label: string;
-  onPress: () => void;
-}) {
-  return (
-    <Pressable
-      accessibilityRole="button"
-      onPress={onPress}
-      style={[styles.filterPill, active ? styles.filterPillActive : null]}>
-      <Text style={[styles.filterText, active ? styles.filterTextActive : null]}>{label}</Text>
-    </Pressable>
   );
 }
 
@@ -386,6 +381,18 @@ function AgendaCard({
       </View>
     </Animatable.View>
   );
+}
+
+function toggleId(current: Set<number>, eventId: number, shouldContain: boolean) {
+  const next = new Set(current);
+
+  if (shouldContain) {
+    next.add(eventId);
+  } else {
+    next.delete(eventId);
+  }
+
+  return next;
 }
 
 function startOfMonth(value: Date) {

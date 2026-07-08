@@ -27,6 +27,14 @@ export async function requestJson<T>(path: string, init?: RequestInit, schema?: 
       throw new AuthSessionError();
     }
 
+    if (response.status === 409 && path.endsWith('/subscription')) {
+      throw new Error('Você já está inscrito neste evento.');
+    }
+
+    if (response.status === 404 && path.endsWith('/subscription')) {
+      throw new Error('Você não está inscrito neste evento.');
+    }
+
     if (response.status === 404 && path.startsWith('/events/')) {
       throw new Error('Evento não encontrado ou você não tem permissão para alterá-lo.');
     }

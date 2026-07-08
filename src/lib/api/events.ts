@@ -1,18 +1,39 @@
 import { z } from 'zod';
 
-import { request, requestPublic } from './client';
+import { request } from './client';
 import {
   campusEventSchema,
   EventCreateIn,
   EventUpdateIn,
+  subscriptionOutSchema,
 } from './schemas';
 
 export async function listEvents() {
-  return requestPublic('/events', undefined, z.array(campusEventSchema));
+  return request('/events', undefined, z.array(campusEventSchema));
+}
+
+export async function listSubscribedEvents() {
+  return request('/events/subscriptions/me', undefined, z.array(campusEventSchema));
 }
 
 export async function getEvent(eventId: number) {
-  return requestPublic(`/events/${eventId}`, undefined, campusEventSchema);
+  return request(`/events/${eventId}`, undefined, campusEventSchema);
+}
+
+export async function subscribeToEvent(eventId: number) {
+  return request(
+    `/events/${eventId}/subscription`,
+    {
+      method: 'POST',
+    },
+    subscriptionOutSchema,
+  );
+}
+
+export async function unsubscribeFromEvent(eventId: number) {
+  return request<void>(`/events/${eventId}/subscription`, {
+    method: 'DELETE',
+  });
 }
 
 export async function createEvent(payload: EventCreateIn) {
