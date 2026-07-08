@@ -6,8 +6,10 @@ Este guia define o padrao esperado para contribuicoes no frontend.
 
 - `app/` deve conter apenas rotas do Expo Router e wrappers pequenos.
 - `src/view/screens/` deve conter telas completas.
+- `src/view/hooks/` deve conter hooks usados pela camada visual.
 - `components/` deve conter componentes reutilizaveis de interface.
 - `src/lib/` deve conter API, storage, configuracao e utilitarios sem dependencia visual.
+- `src/lib/api/campus.ts` deve ser a fachada publica da API para telas e componentes; novas chamadas devem ficar em modulos internos por dominio (`auth.ts`, `users.ts`, `events.ts`, etc.) e ser reexportadas pela fachada.
 - Evite criar abstracoes antes de haver repeticao real.
 - Prefira nomes descritivos em ingles para codigo e mensagens em pt-BR para usuario.
 

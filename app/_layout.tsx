@@ -4,7 +4,7 @@ import { StatusBar } from 'expo-status-bar';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import 'react-native-reanimated';
 
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useColorScheme } from '@/src/view/hooks/useColorScheme';
 
 export const unstable_settings = {
   anchor: '(auth)',
