@@ -28,6 +28,12 @@ const campusEventSchema = z.object({
   name: z.string(),
   user_id: z.number().optional(),
 });
+const subscriptionOutSchema = z.object({
+  created_at: z.string(),
+  event_id: z.number(),
+  id: z.number(),
+  user_id: z.number(),
+});
 const healthOutSchema = z.object({
   status: z.literal('ok'),
 });
@@ -48,6 +54,8 @@ export type CampusUser = z.infer<typeof campusUserSchema>;
 export type CurrentUser = CampusUser;
 
 export type CampusEvent = z.infer<typeof campusEventSchema>;
+
+export type SubscriptionOut = z.infer<typeof subscriptionOutSchema>;
 
 type TokenPayload = z.infer<typeof tokenPayloadSchema>;
 
@@ -229,11 +237,31 @@ export async function updateProfilePicture(userId: number, imageUri: string) {
 }
 
 export async function listEvents() {
-  return requestPublic('/events', undefined, z.array(campusEventSchema));
+  return request('/events', undefined, z.array(campusEventSchema));
+}
+
+export async function listSubscribedEvents() {
+  return request('/events/subscriptions/me', undefined, z.array(campusEventSchema));
 }
 
 export async function getEvent(eventId: number) {
-  return requestPublic(`/events/${eventId}`, undefined, campusEventSchema);
+  return request(`/events/${eventId}`, undefined, campusEventSchema);
+}
+
+export async function subscribeToEvent(eventId: number) {
+  return request(
+    `/events/${eventId}/subscription`,
+    {
+      method: 'POST',
+    },
+    subscriptionOutSchema,
+  );
+}
+
+export async function unsubscribeFromEvent(eventId: number) {
+  return request<void>(`/events/${eventId}/subscription`, {
+    method: 'DELETE',
+  });
 }
 
 export async function createEvent(payload: EventCreateIn) {
@@ -409,6 +437,14 @@ async function requestJson<T>(path: string, init?: RequestInit, schema?: z.ZodTy
     if (response.status === 401) {
       await clearAuthToken();
       throw new AuthSessionError();
+    }
+
+    if (response.status === 409 && path.endsWith('/subscription')) {
+      throw new Error('Você já está inscrito neste evento.');
+    }
+
+    if (response.status === 404 && path.endsWith('/subscription')) {
+      throw new Error('Você não está inscrito neste evento.');
     }
 
     if (response.status === 404 && path.startsWith('/events/')) {

@@ -5,6 +5,7 @@ import { useCallback, useState } from 'react';
 import * as Animatable from 'react-native-animatable';
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   ListRenderItem,
   Pressable,
@@ -18,6 +19,9 @@ import {
   CampusEvent,
   isAuthSessionError,
   listEvents,
+  listSubscribedEvents,
+  subscribeToEvent,
+  unsubscribeFromEvent,
 } from '@/src/lib/api/campus';
 import { formatCampusDayMonth } from '@/src/lib/datetime/campusTime';
 import { getEventImageUri } from '@/src/lib/events/eventImage';
@@ -25,10 +29,59 @@ import { getEventImageUri } from '@/src/lib/events/eventImage';
 export default function HomeScreen() {
   const router = useRouter();
   const [events, setEvents] = useState<CampusEvent[]>([]);
+  const [subscribedIds, setSubscribedIds] = useState<Set<number>>(() => new Set());
+  const [pendingIds, setPendingIds] = useState<Set<number>>(() => new Set());
   const [isLoading, setIsLoading] = useState(false);
+
+  const handleToggleSubscription = useCallback(
+    async (eventId: number) => {
+      const wasSubscribed = subscribedIds.has(eventId);
+
+      setPendingIds((current) => new Set(current).add(eventId));
+      setSubscribedIds((current) => toggleId(current, eventId, !wasSubscribed));
+
+      try {
+        if (wasSubscribed) {
+          await unsubscribeFromEvent(eventId);
+        } else {
+          await subscribeToEvent(eventId);
+        }
+      } catch (toggleError) {
+        if (isAuthSessionError(toggleError)) {
+          router.replace('/login' as never);
+          return;
+        }
+
+        // Rollback the optimistic change on failure.
+        setSubscribedIds((current) => toggleId(current, eventId, wasSubscribed));
+        Alert.alert(
+          'Ops',
+          toggleError instanceof Error
+            ? toggleError.message
+            : 'Não foi possível atualizar sua inscrição.',
+        );
+      } finally {
+        setPendingIds((current) => {
+          const next = new Set(current);
+          next.delete(eventId);
+          return next;
+        });
+      }
+    },
+    [router, subscribedIds],
+  );
+
   const renderEvent = useCallback<ListRenderItem<CampusEvent>>(
-    ({ item, index }) => <EventCard event={item} index={index} />,
-    [],
+    ({ item, index }) => (
+      <EventCard
+        event={item}
+        index={index}
+        isPending={pendingIds.has(item.id)}
+        isSubscribed={subscribedIds.has(item.id)}
+        onToggleSubscription={handleToggleSubscription}
+      />
+    ),
+    [handleToggleSubscription, pendingIds, subscribedIds],
   );
 
   useFocusEffect(
@@ -39,13 +92,17 @@ export default function HomeScreen() {
         setIsLoading(true);
 
         try {
-          const apiEvents = await listEvents();
+          const [apiEvents, subscribedEvents] = await Promise.all([
+            listEvents(),
+            listSubscribedEvents(),
+          ]);
 
           if (!isMounted) {
             return;
           }
 
           setEvents(apiEvents);
+          setSubscribedIds(new Set(subscribedEvents.map((event) => event.id)));
         } catch (homeError) {
           if (isAuthSessionError(homeError)) {
             router.replace('/login' as never);
@@ -54,6 +111,7 @@ export default function HomeScreen() {
 
           if (isMounted) {
             setEvents([]);
+            setSubscribedIds(new Set());
           }
         } finally {
           if (isMounted) {
@@ -124,9 +182,15 @@ function EmptyEvents() {
 function EventCard({
   event,
   index,
+  isPending,
+  isSubscribed,
+  onToggleSubscription,
 }: {
   event: CampusEvent;
   index: number;
+  isPending: boolean;
+  isSubscribed: boolean;
+  onToggleSubscription: (eventId: number) => void;
 }) {
   const imageUri = getEventImageUri(event.image);
 
@@ -165,8 +229,27 @@ function EventCard({
           {event.description}
         </Text>
         <Animatable.View animation="fadeIn" delay={index * 90 + 180} useNativeDriver>
-          <Pressable accessibilityRole="button" style={styles.eventButton}>
-            <Text style={styles.eventButtonText}>Inscrever-se</Text>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityState={{ disabled: isPending, selected: isSubscribed }}
+            disabled={isPending}
+            onPress={() => onToggleSubscription(event.id)}
+            style={[
+              styles.eventButton,
+              isSubscribed && styles.eventButtonSubscribed,
+              isPending && styles.eventButtonPending,
+            ]}>
+            {isPending ? (
+              <ActivityIndicator color="#111111" size="small" />
+            ) : (
+              <Text
+                style={[
+                  styles.eventButtonText,
+                  isSubscribed && styles.eventButtonTextSubscribed,
+                ]}>
+                {isSubscribed ? 'Cancelar inscrição' : 'Inscrever-se'}
+              </Text>
+            )}
           </Pressable>
         </Animatable.View>
       </View>
@@ -176,6 +259,18 @@ function EventCard({
 
 function keyExtractor(event: CampusEvent) {
   return String(event.id);
+}
+
+function toggleId(current: Set<number>, eventId: number, shouldContain: boolean) {
+  const next = new Set(current);
+
+  if (shouldContain) {
+    next.add(eventId);
+  } else {
+    next.delete(eventId);
+  }
+
+  return next;
 }
 
 const styles = StyleSheet.create({
@@ -334,10 +429,21 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginTop: 16,
   },
+  eventButtonSubscribed: {
+    backgroundColor: '#FFFFFF',
+    borderColor: '#111111',
+    borderWidth: 1.5,
+  },
+  eventButtonPending: {
+    opacity: 0.7,
+  },
   eventButtonText: {
     color: '#111111',
     fontSize: 12,
     fontWeight: '900',
     textTransform: 'uppercase',
+  },
+  eventButtonTextSubscribed: {
+    color: '#111111',
   },
 });

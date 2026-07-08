@@ -5,14 +5,22 @@ import * as Animatable from 'react-native-animatable';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { CampusEvent, isAuthSessionError, listEvents } from '@/src/lib/api/campus';
+import {
+  CampusEvent,
+  isAuthSessionError,
+  listEvents,
+  listSubscribedEvents,
+} from '@/src/lib/api/campus';
 import { formatCampusTimeRange, getCampusDateKey } from '@/src/lib/datetime/campusTime';
 
 const weekDays = ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'];
 
+type EventFilter = 'all' | 'subscribed';
+
 export default function CalendarScreen() {
   const router = useRouter();
   const [events, setEvents] = useState<CampusEvent[]>([]);
+  const [filter, setFilter] = useState<EventFilter>('all');
   const [monthDate, setMonthDate] = useState(() => startOfMonth(new Date()));
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -34,7 +42,8 @@ export default function CalendarScreen() {
         setError(null);
 
         try {
-          const apiEvents = await listEvents();
+          const apiEvents =
+            filter === 'subscribed' ? await listSubscribedEvents() : await listEvents();
           const sortedEvents = [...apiEvents].sort(
             (left, right) =>
               new Date(left.event_datetime).getTime() - new Date(right.event_datetime).getTime(),
@@ -75,7 +84,7 @@ export default function CalendarScreen() {
       return () => {
         isMounted = false;
       };
-    }, [router]),
+    }, [filter, router]),
   );
 
   function goToPreviousMonth() {
@@ -132,12 +141,24 @@ export default function CalendarScreen() {
           duration={360}
           style={styles.filters}
           useNativeDriver>
-          <View style={[styles.filterPill, styles.filterPillActive]}>
-            <Text style={[styles.filterText, styles.filterTextActive]}>Todos</Text>
-          </View>
-          <View style={styles.filterPill}>
-            <Text style={styles.filterText}>Inscritos</Text>
-          </View>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityState={{ selected: filter === 'all' }}
+            onPress={() => setFilter('all')}
+            style={[styles.filterPill, filter === 'all' && styles.filterPillActive]}>
+            <Text style={[styles.filterText, filter === 'all' && styles.filterTextActive]}>
+              Todos
+            </Text>
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityState={{ selected: filter === 'subscribed' }}
+            onPress={() => setFilter('subscribed')}
+            style={[styles.filterPill, filter === 'subscribed' && styles.filterPillActive]}>
+            <Text style={[styles.filterText, filter === 'subscribed' && styles.filterTextActive]}>
+              Inscritos
+            </Text>
+          </Pressable>
         </Animatable.View>
 
         {isLoading ? (
