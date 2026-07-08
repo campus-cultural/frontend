@@ -65,7 +65,7 @@ Após mudar o `.env`, reinicie o Metro (`Ctrl+C` e `npm start`) ou use `npm run 
 
 - Expo SDK 54 · React Native 0.81 · Expo Router · TypeScript
 - EAS Build (Android/iOS)
-- Cliente HTTP: `fetch` em `src/lib/api/campus.ts` → `{EXPO_PUBLIC_API_URL}/users/...`, `/events/...`, `/health`
+- Cliente HTTP: `fetch` em `src/lib/api/core.ts`; telas usam a fachada `src/lib/api/campus.ts` → `{EXPO_PUBLIC_API_URL}/users/...`, `/events/...`, `/health`
 
 ## Comandos
 
@@ -135,12 +135,24 @@ npm run check && npm run export:web
 ## Estrutura
 
 ```text
-app/                  rotas (Expo Router)
-src/lib/api/          cliente da API
-src/lib/config/env.ts leitura de EXPO_PUBLIC_API_URL
-src/view/screens/     telas
-components/           UI compartilhada
-docs/CODE_STYLE.md    convenções
+app/                         rotas (Expo Router); mantenha wrappers pequenos
+src/view/screens/            telas completas por fluxo
+src/view/hooks/              hooks usados pela camada visual
+components/                  UI compartilhada entre telas
+src/lib/api/campus.ts        fachada publica da API usada pelas telas
+src/lib/api/auth.ts          endpoints de autenticacao
+src/lib/api/users.ts         endpoints de usuarios e perfil
+src/lib/api/events.ts        endpoints de eventos
+src/lib/api/client.ts        cliente HTTP autenticado/publico
+src/lib/api/core.ts          fetch, base URL e tratamento de erros HTTP
+src/lib/api/session.ts       sessao, token JWT e refresh
+src/lib/api/schemas.ts       schemas Zod e tipos da API
+src/lib/auth/                storage de token
+src/lib/config/env.ts        leitura de EXPO_PUBLIC_API_URL
+src/lib/datetime/            datas e componentes auxiliares de calendario
+src/lib/events/              utilitarios de eventos
+src/lib/navigation/          guardas de navegacao
+docs/CODE_STYLE.md           convencoes
 ```
 
 ## Contribuição
